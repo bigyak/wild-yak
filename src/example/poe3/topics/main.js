@@ -1,6 +1,5 @@
 /* @flow */
 async function onMainEntry(context) {
-  resetNesting();
   if (context.isFirstTimeUser) {
 
   }

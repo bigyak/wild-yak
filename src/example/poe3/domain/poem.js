@@ -19,6 +19,9 @@ export async function save(poem) {
   return await coll.insertOne(poem);
 }
 
-export async function getFirstLine(poem: object, maxChars: number) {
+export async function getFirstLine(poem, maxChars) {
+}
+
+export async function validateHaiku(poem) {
 
 }

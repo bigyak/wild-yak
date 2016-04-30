@@ -1,5 +1,5 @@
 /* @flow */
-import { defTopics, defPattern, defParser, init, switchToTopic, exitTopic } from "wild-yak";
+import { defTopics, defPattern, defParser, init, enterTopic, exitTopic } from "wild-yak";
 
 import mainTopic from "./topics/main";
 import newHaikuTopic from "./topics/new-haiku";
@@ -12,13 +12,42 @@ export default function() {
   const topics = defTopics({
     "global": {
       patterns: [
-        defPattern(["^new.?haiku$"], async () => await switchToTopic("new-haiku")),
-        defPattern(["^private$", "^private.?haiku$", "^new.?private.?haiku$"], async () => await switchToTopic("new-haiku", { accessibility: "private" })),
-        defPattern(["^edit$"], async () => await switchToTopic("edit-haiku")),
-        defPattern(["^show$"], async () => await switchToTopic("show-haiku")),
-        defPattern(["^opt\.out$", "^unsubscribe$"], async () => await switchToTopic("unsubscribe")),
-        defPattern(["^back$", "b"], help, async () => await exitTopic(context)),
-        defPattern(["^help$", "h", "\?"], help, async () => await switchToTopic("help"))
+        defPattern(
+          ["^new-haiku$", "^new haiku$"],
+          async (context, message) => await enterTopic(context, "new-haiku", { message })
+        ),
+        defPattern(
+          ["^private-haiku$", "^private$", "^private haiku$", "^new.?private.?haiku$"],
+          async (context, message) => await enterTopic(context, "new-haiku", { access: "private" })
+        ),
+        defPattern(
+          ["^edit (\d*)$"],
+          async (context, message, matches) => await enterTopic(context, "edit-haiku", { matches })
+        ),
+        defPattern(
+          ["^show (\d*)$"],
+          async (context, message, matches) => await enterTopic(context, "show-haiku", { matches })
+        ),
+        defPattern(
+          ["^follow$", "^follow ([A-z]\w*)"],
+          async (context, message, matches) => await enterTopic(context, "follow", { matches })
+        ),
+        defPattern(
+          ["^unfollow$", "^unfollow ([A-z]\w*)"],
+          async (context, message, matches) => await enterTopic(context, "unfollow", { matches })
+        ),
+        defPattern(
+          ["^opt-out$", "^opt out$", "^unsubscribe$", "^stop$"],
+          async (context, message) => await enterTopic(context, "unsubscribe")
+        ),
+        defPattern(
+          ["^back$", "b", "^cancel$", "c"],
+          async (context, message) => await exitTopic(context)
+        ),
+        defPattern(
+          ["^help$", "^help\s+(\w*)$", "^h\s+(\w*)$", "^\?\s+(\w*)$"],
+          async (context, message, matches) => await enterTopic(context, "help", { matches })
+        )
       ]
     },
     "main": mainTopic(),

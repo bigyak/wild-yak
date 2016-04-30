@@ -5,9 +5,8 @@ async function onEntry(context, args) {
   sendMessage(context, "Three lines. Type away...");
 }
 
-async function parseHaiku(context, message) {
-  //Check if three lines...
-  const validation = await haiku.validate(message.text);
+async function isValid(context, message) {
+  const validation = await poem.validateHaiku(message.text);
   return {
     isValid: validation.isValid,
     text: message.text,
@@ -17,9 +16,7 @@ async function parseHaiku(context, message) {
 
 async function saveHaiku(context, args) {
   if (args.isValid) {
-    const record = await haiku.save(args.text, context.username);
-    sendMessage(context, `Saved haiku as ${record.id}.`);
-    await exitTopic(context);
+    await exitTopic(context, { text: args.text });
   } else {
     sendMessage(context, validation.message);
   }
@@ -29,7 +26,7 @@ export default async function() {
   return {
     onEntry,
     parsers: [
-      defParser(parseHaiku, saveHaiku)
+      defParser(isValid, saveHaiku)
     ]
   };
 }

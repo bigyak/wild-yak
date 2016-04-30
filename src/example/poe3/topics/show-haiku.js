@@ -8,15 +8,14 @@ async function onEntry(context, args) {
     exitTopic(context);
   } else if (args.username) {
     const items = await libPoem.getPoemsByUser(args.username);
-    sendMessage(context, item.text);
+    sendMessage(context, items.map(i => i.text).join("\n\n");
     exitTopic(context);
+  } else if (args.action === "newest"){
+
+  } else if (args.action === "random") {
+
   } else {
-    const items = await libPoem.getPoemsByUser(context.username);
-    sendMessage(context, {
-      type: "option",
-      text: `You have ${items.length} haikus. Select the one you wish to edit.`
-      options: items.map(i => `${i.id} ${haiku.getFirstLine(i, 32)}...`)
-    });
+    
   }
 }
 
