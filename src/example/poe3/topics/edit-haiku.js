@@ -1,9 +1,9 @@
 /* @flow */
-import haiku from "../domain/haiku";
+import libPoem from "../domain/poem";
 
 async function onEntry(context, args) {
   if (args.id) {
-    const item = await haiku.get(args.id, context.username);
+    const item = await libPoem.get(args.id, context.username);
     sendMessage(context, {
       type: "option",
       text: item.text
@@ -15,11 +15,11 @@ async function onEntry(context, args) {
     });
     switchToTopic("parse-haiku");
   } else {
-    const items = await haiku.getAll(context.username);
+    const items = await libPoem.getPoemsByUser(context.username, type: "haiku");
     sendMessage(context, {
       type: "option",
       text: `You have ${items.length} haikus. Select the one you wish to edit.`
-      options: items.map(i => `${haiku.id} ${haiku.getFirstLine(i, 32)}...`)
+      options: items.map(i => `${i.id} ${libPoem.getFirstLine(i, 32)}...`)
     });
   }
 }
