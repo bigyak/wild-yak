@@ -36,7 +36,7 @@ const topics = defTopics({
           }
         },
         async (context, args) => {
-          await libPoem.save({ type: "haiku", userid: context.userid, username: context.username, text: args.text });
+          await libPoem.save({ type: "haiku", userid: context.userid, username: context.username, text });
         }
       ),
       defPattern(
@@ -49,7 +49,7 @@ const topics = defTopics({
       ),
       defPattern(
         "edit-haiku-by-id",
-        ["^edit (\d+)$"],
+        ["^edit #?(\d+)$"],
         async (context, message, matches) => {
           await exitAllTopics(context);
           await enterTopic(context, "edit-haiku-by-id", { matches[1] })
