@@ -4,7 +4,7 @@ import libUser from "../domain/user";
 
 async function onEntry(context, matches) {
   if (matches.length === 2) {
-    const usernames = matches[1];
+    const username = matches[1];
     exitTopic(context);
   } else {
     sendMessage(context, {

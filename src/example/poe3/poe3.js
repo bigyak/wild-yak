@@ -2,14 +2,19 @@
 import { defTopics, defPattern, defParser, init, enterTopic, exitTopic } from "wild-yak";
 
 import main from "./topics/main";
-import newHaiku from "./topics/new-haiku";
-import editHaiku from "./topics/edit-haiku";
-import parseHaiku from "./topics/edit-haiku";
+
+import newHaiku from "./topics/edit/create-haiku";
+import editHaiku from "./topics/edit/edit-haiku";
+import parseHaiku from "./topics/edit/parse-haiku";
+
 import showHaiku from "./topics/show-haiku";
 import showHaikuById from "./topics/show-haiku-by-id";
 import showHaikuByUsername from "./topics/show-haiku-by-username";
+
 import unsubscribe from "./topics/unsubscribe";
-import help from "./topics/help";
+
+import tip from "./topics/other/tip";
+import help from "./topics/other/help";
 
 import libPoem from "./domain/poem";
 
@@ -143,6 +148,11 @@ const topics = defTopics({
         }
       ),
       defPattern(
+        "tip",
+        ["^tip$"],
+        async (context, message) => await enterTopic(context, "tip")
+      ),
+      defPattern(
         "help",
         ["^help$", "^help\s+(\w*)$", "^h\s+(\w*)$", "^\?\s+(\w*)$"],
         async (context, message, matches) => await enterTopic(context, "help", { matches })
@@ -151,11 +161,6 @@ const topics = defTopics({
         "help-exact",
         ["^help$"],
         async (context, message) => await enterTopic(context, "help")
-      ),
-      defPattern(
-        "tip",
-        ["^tip$"],
-        async (context, message) => await enterTopic(context, "tip")
       )
     ]
   },
