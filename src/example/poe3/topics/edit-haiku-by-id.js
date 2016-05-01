@@ -27,13 +27,13 @@ async function editHaiku(context, text) {
 async function deleteHaiku(context) {
   const id = context.current.state.id;
   const item = await libPoem.remove({ id });
-  exitTopic(context);
+  exitTopic(context, item);
 }
 
 export const topic = {
   onEntry,
   parsers: [
     defPattern("edit", async (context) => await enterTopic("parse-haiku", editHaiku)),
-    defPattern("delete", deleteHaiku),
+    defPattern("delete", deleteHaiku)
   ]
 }

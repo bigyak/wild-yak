@@ -8,7 +8,7 @@ async function onEntry(context, message) {
 
 async function newHaiku(context, text) {
   const item = await libPoem.insert({ text, type: "haiku" });
-  exitTopic(context);
+  exitTopic(context, item);
 }
 
 export const topic = {

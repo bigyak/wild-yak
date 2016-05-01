@@ -52,7 +52,7 @@ const topics = defTopics({
       ),
       defPattern(
         "show",
-        ["^show (\d*)$"],
+        ["^show$"],
         async (context, message, matches) => {
           await exitAllTopics(context);
           await enterTopic(context, "show-haiku", { matches });
@@ -99,6 +99,27 @@ const topics = defTopics({
         }
       ),
       defPattern(
+        "message",
+        ["^message$"],
+        async (context) => {
+          await enterTopic(context, "message");
+        }
+      ),
+      defPattern(
+        "message-username",
+        ["^message ([A-z]\w*)$"],
+        async (context, message, matches) => {
+          await enterTopic(context, "message-username", { username: matches[1] });
+        }
+      ),
+      defPattern(
+        "message-username-inline",
+        ["^message ([A-z]\w*)(\s?(.*))$"],
+        async (context, message, matches) => {
+          await enterTopic(context, "message-username-inline", { username: matches[1], message: matches[3] });
+        }
+      ),
+      defPattern(
         "my-account",
         ["^my-account$", "^my account$"],
         async (context, message, matches) => {
@@ -130,6 +151,11 @@ const topics = defTopics({
         "help-exact",
         ["^help$"],
         async (context, message) => await enterTopic(context, "help")
+      ),
+      defPattern(
+        "tip",
+        ["^tip$"],
+        async (context, message) => await enterTopic(context, "tip")
       )
     ]
   },
