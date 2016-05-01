@@ -2,28 +2,31 @@
 import libPoem from "../domain/poem";
 
 async function onEntry(context, args) {
-  if (args.id) {
-    const item = await libPoem.get(args.id);
-    sendMessage(context, item.text);
-    exitTopic(context);
-  } else if (args.username) {
-    const items = await libPoem.getPoemsByUser(args.username);
-    sendMessage(context, items.map(i => i.text).join("\n\n");
-    exitTopic(context);
-  } else if (args.action === "newest"){
-
-  } else if (args.action === "random") {
-
-  } else {
-    
-  }
+  sendMessage({
+    type: 'option',
+    text: "What would you like to see?",
+    items: [
+      "Newest",
+      "All time favorites",
+      "Random"
+    ]
+  });
 }
 
-export default async function() {
-  return {
-    onEntry,
-    patterns: [
-      defPattern("show [0-9+]", "")
-    ]
-  };
+async function showNewest(context) {
+}
+
+async function showNewest(context) {
+}
+
+async function showNewest(context) {
+}
+
+export default {
+  onEntry,
+  parsers: [
+    defPattern("newest", showNewest),
+    defPattern("all time favorites", showAllTimeFavorites),
+    defPattern("random", showRandom)
+  ]
 }

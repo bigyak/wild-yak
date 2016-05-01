@@ -2,14 +2,14 @@
 async function onMainEntry(context) {
   if (context.isFirstTimeUser) {
 
+  } else {
+
   }
 }
 
-export default async function() {
-  return {
-    onEntry: onMainEntry
-    patterns: [
-      defPattern(["hi", "hello"], hi),
-    ]
-  };
+export const topic = {
+  onEntry: onMainEntry
+  parsers: [
+    defPattern(["hi", "hello"], hi),
+  ]
 }

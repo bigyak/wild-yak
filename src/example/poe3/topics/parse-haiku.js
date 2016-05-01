@@ -1,12 +1,12 @@
 /* @flow */
-import haiku from "../domain/haiku";
+import libPoem from "../domain/poem";
 
 async function onEntry(context, args) {
-  sendMessage(context, "Three lines. Type away...");
+  sendTextMessage(context, "To create a haiku, type three lines...");
 }
 
-async function isValid(context, message) {
-  const validation = await poem.validateHaiku(message.text);
+export async function parser(context, message) {
+  const validation = await libPoem.validateHaiku(message.text);
   return {
     isValid: validation.isValid,
     text: message.text,
@@ -14,19 +14,13 @@ async function isValid(context, message) {
   }
 }
 
-async function saveHaiku(context, args) {
-  if (args.isValid) {
-    await exitTopic(context, { text: args.text });
-  } else {
-    sendMessage(context, validation.message);
-  }
+async function parseHaiku(context, args) {
+  await exitTopic(context, args);
 }
 
-export default async function() {
-  return {
-    onEntry,
-    parsers: [
-      defParser(isValid, saveHaiku)
-    ]
-  };
+export const topic = {
+  onEntry,
+  parsers: [
+    defParser("read-lines", parser, parseHaiku)
+  ]
 }

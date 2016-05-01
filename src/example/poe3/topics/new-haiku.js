@@ -1,13 +1,16 @@
 /* @flow */
 import libPoem from "../domain/poem";
 
-async function newHaiku(context, args) {
-  const item = await libPoem.insert({ text: args.text, type: "haiku" });
+async function onEntry(context, message) {
+  disablePatternsExcept(context, ["back", "help-exact"]);
+  await enterTopic(context, "parse-haiku", null, newHaiku);
+}
+
+async function newHaiku(context, text) {
+  const item = await libPoem.insert({ text, type: "haiku" });
   exitTopic(context);
 }
 
-export default async function() {
-  return {
-    onEntry: async (context, message) => await enterTopic(context, "parse-haiku", newHaiku)
-  };
+export const topic = {
+  onEntry
 }

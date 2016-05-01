@@ -7,7 +7,7 @@ async function onEntry(context, args) {
     await _editImpl(context, id);
   } else {
     const items = await libPoem.getPoemsByUser(context.username, type: "haiku");
-    sendMessage(context, {
+    sendTextMessage(context, {
       type: "option",
       text: `You have ${items.length} haikus. Which one do you want to edit?`
       options: items.map(i => `${i.id} ${libPoem.getFirstLine(i, 32)}...`)
@@ -26,26 +26,31 @@ async function editHaikuById(context, args) {
   await _editImpl(context, id);
 }
 
+async function deleteHaiku(context) {
+  const id = context.current.state.id;
+  const item = await libPoem.remove({ id });
+  exitTopic(context);
+}
+
 async function _editImpl(context, id) {
   const item = await libPoem.get(id, context.username);
-  sendMessage(context, {
+  sendTextMessage(context, {
     type: "option",
     text: item.text
     options: [
-      "Edit this haiku",
-      "Delete?",
+      "Edit",
+      "Delete",
       "Cancel"
     ]
   });
   context.current.state.id = id;
 }
 
-export default async function() {
-  return {
-    onEntry,
-    patterns: [
-      defPattern("edit this haiku", async (context) => await enterTopic("parse-haiku", editHaiku)),
-      defPattern("^\([0-9]+)\s+.*", async (context, message, args) => await editHaikuById(context, { matches }))
-    ]
-  };
+export const topic = {
+  onEntry,
+  parsers: [
+    defPattern("edit", async (context) => await enterTopic("parse-haiku", editHaiku)),
+    defPattern("delete", deleteHaiku),
+    defPattern("^\([0-9]+)\s+.*", async (context, message, args) => await editHaikuById(context, { matches }))
+  ]
 }
