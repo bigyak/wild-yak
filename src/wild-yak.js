@@ -21,42 +21,28 @@ export type PatternOptions = {}
 
 export type ParserOptions = {}
 
-export function createContext() {
-  return {};
-}
 
-export function createTopics() {
-  return {};
-}
-
-export function defTopic(topics: Topics, name: string, fn: Function) {
-  const topic = {
-    patterns: [],
-    parsers: [],
-    virgin: true,
-    fn: fn
+export function defPatterns(name, pattern, handle, options) {
+  const regex = new Regex(pattern);
+  return {
+    name,
+    parse: async (context, message) => {
+      const text = message.text;
+      const matches = regex.exec(text);
+      return matches !== null ? matches : false;
+    },
+    handle,
+    options
   };
-  topics[name] = topic;
-  return topic;
 }
 
-
-export function defPattern(topic: Topic, pattern: string, handler: Handler, options: PatternOptions) {
-  return defPatterns(topic, [pattern], handler, options)
-}
-
-export function defPatterns(topic: Topic, patterns: Array<string>, handler: Handler, options = PatternOptions) {
-  topic.patterns.push({
-    patterns,
-    handler
-  });
-}
-
-export function defParser(topic: Topic, parser: Parser, handler: Handler, options = ParserOptions) {
-  topic.parsers.push({
-    parser,
-    handler
-  });
+export function defParser(name, parse, handler, options) {
+  return {
+    name,
+    parse,
+    handle,
+    options
+  };
 }
 
 export function activeContext(session) {
@@ -64,7 +50,12 @@ export function activeContext(session) {
 }
 
 export async function enterTopic(session, topic, args, cb) {
-  const context = { topic, cb: cb ? cb.name : undefined };
+  const context = {
+    topic,
+    activeParsers: [],
+    disabledParsers: [],
+    cb: cb ? cb.name : undefined
+  };
   return session.contexts.push(context);
 }
 
@@ -81,22 +72,66 @@ export async function exitAllTopics(session) {
   session.contexts = [];
 }
 
+export async function disableParsersExcept(session, list) {
+  const context = activeContext(session);
+  context.activeParsers = list;
+}
+
+export async function disableParsers(session, list) {
+  const context = activeContext(session);
+  context.disabledParsers = list;
+}
+
+async function parse(parser, session, message) {
+  const parseResult = await parser.parse(session, message);
+  if (parseResult !== false || parseResult !== undefined) {
+    await parser.handle(session, parseResult);
+    return true;
+  } else {
+    return false;
+  }
+}
+
 export async function init(topics: Topics) {
   return async function(message, session) {
-    const state = currentState(session);
-    const currentTopic = topics.definition[state.topic];
+    const context = activeContext(session);
 
-    //We have to execute parsers in the current and global topics
-    const parsers = currentTopic.definition.parsers.concat(topics.definition.global.parsers);
+    const globalTopic = topics.definition.global;
+    const currentTopic = topics.definition[context.topic];
 
     session.topics = topics;
-    for (let parser in parsers) {
-      const parseResult = await parser.parse(session, message);
-      if (parseResult !== false || parseResult !== undefined) {
-        await parser.handle(session, parseResult);
+
+    /*
+      Check the parsers in the local topic first.
+    */
+    const handled = false;
+    for (let parser in currentTopic.definition.parsers) {
+      handled = await parse(parser, session, message);
+      if (handled) {
         break;
       }
     }
-    session.topics = undefined;
+
+    /*
+      If not found, try global definitions.
+      While checking global definitions,
+        if activeParsers array is defined, the parser must be in it.
+        if activeParsers is not defined, the parser must not be in disabledParsers
+    */
+    if (!handled) {
+      for (let parser in global.definition.parsers) {
+        if (
+          activeParsers.contains(parser.name) ||
+          (activeParsers.length === 0 && !disabledParsers.contains(parser.name))
+        ) {
+          handled = await parse(parser, session, message);
+          if (handled) {
+            break;
+          }
+        }
+      }
+    }
+
+    session.topics = undefined; //Do this since session is serialized for each user session. Topics is
   }
 }
