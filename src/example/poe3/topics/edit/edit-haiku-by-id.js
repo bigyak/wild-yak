@@ -13,11 +13,11 @@ async function onEntry(context, id) {
       "Cancel"
     ]
   });
-  context.current.state.id = id;
+  context.current.id = id;
 }
 
 async function editHaiku(context, text) {
-  const id = context.current.state.id;
+  const id = context.current.id;
   const _item = await libPoem.get(id, context.username);
   const item = Object.assign(item, { text });
   const saved = await libPoem.update(item);
@@ -25,7 +25,7 @@ async function editHaiku(context, text) {
 }
 
 async function deleteHaiku(context) {
-  const id = context.current.state.id;
+  const id = context.current.id;
   const item = await libPoem.remove({ id });
   exitTopic(context, item);
 }

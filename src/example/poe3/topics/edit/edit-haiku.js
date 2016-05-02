@@ -16,7 +16,7 @@ async function onEntry(context, args) {
 }
 
 async function editHaiku(context, args) {
-  const id = context.current.state.id;
+  const id = context.current.id;
   const item = await libPoem.update({ id, text: args.text });
   exitTopic(context);
 }
@@ -27,7 +27,7 @@ async function editHaikuById(context, args) {
 }
 
 async function deleteHaiku(context) {
-  const id = context.current.state.id;
+  const id = context.current.id;
   const item = await libPoem.remove({ id });
   exitTopic(context);
 }
@@ -43,7 +43,7 @@ async function _editImpl(context, id) {
       "Cancel"
     ]
   });
-  context.current.state.id = id;
+  context.current.id = id;
 }
 
 export const topic = {

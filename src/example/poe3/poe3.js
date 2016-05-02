@@ -36,7 +36,32 @@ const topics = defTopics({
           }
         },
         async (context, args) => {
+          await exitAllTopics(context);
           await libPoem.save({ type: "haiku", userid: context.userid, username: context.username, text });
+        }
+      ),
+      defPattern(
+        "nickname",
+        ["^nick ([A-z]\w*)$", "^nickname ([A-z]\w*)$"],
+        async (context) => {
+          await exitAllTopics(context);
+          await enterTopic(context, "nickname", { matches })
+        }
+      ),
+      defPattern(
+        "my-nicknames",
+        ["^((show|list|view) )?my nicknames$", "^my nicks$"],
+        async (context) => {
+          await exitAllTopics(context);
+          await enterTopic(context, "my-nicknames")
+        }
+      ),
+      defPattern(
+        "edit",
+        ["^edit$"],
+        async (context) => {
+          await exitAllTopics(context);
+          await enterTopic(context, "edit-haiku", { matches })
         }
       ),
       defPattern(
@@ -153,8 +178,8 @@ const topics = defTopics({
         async (context, message) => await enterTopic(context, "tip")
       ),
       defPattern(
-        "help",
-        ["^help$", "^help\s+(\w*)$", "^h\s+(\w*)$", "^\?\s+(\w*)$"],
+        "help-with",
+        ["^help(\s+(\w+))$", "^h(\s+(\w+))$", "^\?(\s+(\w+))$"],
         async (context, message, matches) => await enterTopic(context, "help", { matches })
       ),
       defPattern(
