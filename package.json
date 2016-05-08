@@ -6,8 +6,6 @@
   "main": "dist/wild-yak",
   "scripts": {
     "start": "./build.sh && node dist/app.js",
-    "monitor": "./build.sh && ./monitor.sh",
-    "test": "./build.sh && ./monitor.sh",
     "test": "mocha dist/test/test.js"
   },
   "dependencies": {

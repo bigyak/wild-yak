@@ -21,8 +21,9 @@ export type PatternOptions = {}
 
 export type ParserOptions = {}
 
+export type RegexHandler = (context: Context, matches: Array) => void
 
-export function defPatterns(name, pattern, handle, options) {
+export function defPatterns(name: string, pattern: string, handle: , options) {
   const regex = new Regex(pattern);
   return {
     name,
@@ -119,7 +120,7 @@ export async function init(topics: Topics) {
         if activeParsers is not defined, the parser must not be in disabledParsers
     */
     if (!handled) {
-      for (let parser in global.definition.parsers) {
+      for (let parser in globalTopic.definition.parsers) {
         if (
           activeParsers.contains(parser.name) ||
           (activeParsers.length === 0 && !disabledParsers.contains(parser.name))
