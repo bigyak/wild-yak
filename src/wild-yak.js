@@ -1,7 +1,7 @@
 /* @flow */
 export type Topic = {
   patterns: Array<string>,
-  parsers: Array<Function>,
+  hooks: Array<Function>,
   virgin: bool,
   fn: () => void
 }
@@ -12,32 +12,36 @@ export type Topics = {
 
 export type Context = {
   name: string,
-  [key: string]: object
+  [key: string]: Object
 }
 
 export type Handler = (session: Context, dict: Object) => void
 
 export type PatternOptions = {}
 
-export type ParserOptions = {}
+export type HookOptions = {}
 
 export type RegexHandler = (context: Context, matches: Array) => void
 
-export function defPatterns(name: string, pattern: string, handle: , options) {
-  const regex = new Regex(pattern);
+export function defPattern(name: string, patterns: Array<string>, handle: Function, options: Object) {
+  const regexen = patterns.map(p => typeof p === "string" ? new RegExp(p) : p);
   return {
     name,
     parse: async (context, message) => {
       const text = message.text;
-      const matches = regex.exec(text);
-      return matches !== null ? matches : false;
+      for (let regex of regexen) {
+        const matches = regex.exec(text);
+        if (matches !== null) {
+          return matches;
+        }
+      }
     },
     handle,
     options
   };
 }
 
-export function defParser(name, parse, handler, options) {
+export function defHook(name, parse, handler, options) {
   return {
     name,
     parse,
@@ -46,86 +50,103 @@ export function defParser(name, parse, handler, options) {
   };
 }
 
+
 export function activeContext(session) {
   return session.contexts.slice(-1)[0];
 }
 
+
 export async function enterTopic(session, topic, args, cb) {
   const context = {
     topic,
-    activeParsers: [],
-    disabledParsers: [],
+    activeHooks: [],
+    disabledHooks: [],
     cb: cb ? cb.name : undefined
   };
+  if (session.topics.definitions[topic].onEntry) {
+    await session.topics.definitions[topic].onEntry(session, args);
+  }
   return session.contexts.push(context);
 }
 
+
 export async function exitTopic(session, args) {
   const lastContext = session.contexts.pop();
-  const lastTopic = session.topics.definition[lastContext.topic];
+  const lastTopic = session.topics.definitions[lastContext.topic];
   if (lastContext.cb) {
     await lastTopic[lastContext.cb](session, args)
   }
   return lastTopic;
 }
 
+
 export async function exitAllTopics(session) {
   session.contexts = [];
 }
 
-export async function disableParsersExcept(session, list) {
+
+export async function disableHooksExcept(session, list) {
   const context = activeContext(session);
-  context.activeParsers = list;
+  context.activeHooks = list;
 }
 
-export async function disableParsers(session, list) {
+
+export async function disableHooks(session, list) {
   const context = activeContext(session);
-  context.disabledParsers = list;
+  context.disabledHooks = list;
 }
 
-async function parse(parser, session, message) {
-  const parseResult = await parser.parse(session, message);
-  if (parseResult !== false || parseResult !== undefined) {
-    await parser.handle(session, parseResult);
-    return true;
+
+async function runHook(hook, session, message) {
+  const parseResult = await hook.parse(session, message);
+  if (parseResult !== undefined) {
+    const handlerResult = await hook.handle(session, parseResult);
+    return [true, handlerResult];
   } else {
-    return false;
+    return [false];
   }
 }
 
+
 export async function init(topics: Topics) {
-  return async function(message, session) {
-    const context = activeContext(session);
-
-    const globalTopic = topics.definition.global;
-    const currentTopic = topics.definition[context.topic];
-
+  return async function(session, message) {
     session.topics = topics;
 
+    if (!session.contexts) {
+      session.contexts = [];
+      await enterTopic(session, "main", message);
+    }
+    const context = activeContext(session);
+
+    const globalTopic = topics.definitions.global;
+    const currentTopic = topics.definitions[context.topic];
+
     /*
-      Check the parsers in the local topic first.
+      Check the hooks in the local topic first.
     */
-    const handled = false;
-    for (let parser in currentTopic.definition.parsers) {
-      handled = await parse(parser, session, message);
-      if (handled) {
-        break;
+    let handlerResult = false, handled = false;
+    if (currentTopic.hooks) {
+      for (let hook of currentTopic.hooks) {
+        [handled, handlerResult] = await runHook(hook, session, message);
+        if (handled) {
+          break;
+        }
       }
     }
 
     /*
-      If not found, try global definitions.
-      While checking global definitions,
-        if activeParsers array is defined, the parser must be in it.
-        if activeParsers is not defined, the parser must not be in disabledParsers
+      If not found, try global topic.
+      While checking global topic,
+        if activeHooks array is defined, the hook must be in it.
+        if activeHooks is not defined, the hook must not be in disabledHooks
     */
-    if (!handled) {
-      for (let parser in globalTopic.definition.parsers) {
+    if (!handled && globalTopic.hooks) {
+      for (let hook of globalTopic.hooks) {
         if (
-          activeParsers.contains(parser.name) ||
-          (activeParsers.length === 0 && !disabledParsers.contains(parser.name))
+          context.activeHooks.includes(hook.name) ||
+          (context.activeHooks.length === 0 && !context.disabledHooks.includes(hook.name))
         ) {
-          handled = await parse(parser, session, message);
+          [handled, handlerResult] = await runHook(hook, session, message);
           if (handled) {
             break;
           }
@@ -134,5 +155,7 @@ export async function init(topics: Topics) {
     }
 
     session.topics = undefined; //Do this since session is serialized for each user session. Topics is
+
+    return handlerResult;
   }
 }

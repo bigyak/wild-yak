@@ -6,16 +6,18 @@
   "main": "dist/wild-yak",
   "scripts": {
     "start": "./build.sh && node dist/app.js",
-    "test": "mocha dist/test/test.js"
+    "test": "./build.sh && mocha --require source-map-support/register dist/test/test.js"
   },
   "dependencies": {
     "babel-polyfill": "*"
   },
   "devDependencies": {
+    "source-map-support": "*",
     "babel-preset-es2015-without-regenerator": "*",
     "babel-preset-stage-2": "*",
     "babel-plugin-transform-class-properties": "*",
     "babel-plugin-transform-async-to-generator": "*",
+    "babel-plugin-transform-flow-strip-types": "*",
     "source-map-loader": "*",
     "babel-loader": "*",
     "mocha": "*",
