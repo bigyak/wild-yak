@@ -5,28 +5,30 @@ export default function getTopics(opts = {}) {
   opts.nickname = opts.nickname || {};
 
   const mainTopic = {
-    onEntry: opts.main.onEntry || (async (session, message) => {})
+    onEntry: opts.main.onEntry
   }
 
   const nicknameTopic = {
-    onEntry: opts.nickname.onEntry || (async (session, message) => {}),
+    onEntry: opts.nickname.onEntry,
     hooks: opts.nickname.hooks
+  }
+
+  const globalTopic = {
+    hooks: [
+      defPattern(
+        "nickname",
+        [/^nick ([A-z]\w*)$/, /^nickname ([A-z]\w*)$/],
+        async (session, matches) => {
+          await exitAllTopics(session);
+          await enterTopic(session, "nickname", matches[1])
+        }
+      ),
+    ]
   }
 
   const topics = {
     definitions: {
-      "global": {
-        hooks: [
-          defPattern(
-            "nickname",
-            [/^nick ([A-z]\w*)$/, /^nickname ([A-z]\w*)$/],
-            async (session, matches) => {
-              await exitAllTopics(session);
-              await enterTopic(session, "nickname", matches[1])
-            }
-          ),
-        ]
-      },
+      "global": globalTopic,
       "main": mainTopic,
       "nickname": nicknameTopic
     }

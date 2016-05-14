@@ -6,7 +6,8 @@
   "main": "dist/wild-yak",
   "scripts": {
     "start": "./build.sh && node dist/app.js",
-    "test": "./build.sh && mocha --require source-map-support/register dist/test/test.js"
+    "test": "./build.sh && mocha --require source-map-support/register dist/test/test.js",
+    "test-debug": "./build.sh && mocha --debug-brk --require source-map-support/register dist/test/test.js"
   },
   "dependencies": {
     "babel-polyfill": "*"
