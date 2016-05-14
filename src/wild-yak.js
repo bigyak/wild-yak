@@ -23,20 +23,20 @@ export type HookOptions = {}
 
 export type RegexHandler = (context: Context, matches: Array) => void
 
-export function defPattern(name: string, patterns: Array<string>, handle: Function, options: Object) {
+export function defPattern(name: string, patterns: Array<string>, handler: Function, options: Object) {
   const regexen = patterns.map(p => typeof p === "string" ? new RegExp(p) : p);
   return {
     name,
     parse: async (context, message) => {
       const text = message.text;
-      for (let regex of regexen) {
-        const matches = regex.exec(text);
+      for (let i = 0; i < regexen.length; i++) {
+        const matches = regexen[i].exec(text);
         if (matches !== null) {
-          return matches;
+          return {message, i, matches};
         }
       }
     },
-    handle,
+    handler,
     options
   };
 }
@@ -45,7 +45,7 @@ export function defHook(name, parse, handler, options) {
   return {
     name,
     parse,
-    handle,
+    handler,
     options
   };
 }
@@ -100,7 +100,7 @@ export async function disableHooks(session, list) {
 async function runHook(hook, session, message) {
   const parseResult = await hook.parse(session, message);
   if (parseResult !== undefined) {
-    const handlerResult = await hook.handle(session, parseResult);
+    const handlerResult = await hook.handler(session, parseResult);
     return [true, handlerResult];
   } else {
     return [false];
