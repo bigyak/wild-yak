@@ -1,6 +1,6 @@
 import __polyfill from "babel-polyfill";
 import should from "should";
-import { init, enterTopic } from "../wild-yak";
+import { init, enterTopic, exitTopic } from "../wild-yak";
 import getTopics from "./topics";
 
 describe("Wild yak", () => {
@@ -13,14 +13,14 @@ describe("Wild yak", () => {
 
   it("Enters main::onEntry(session, message) while starting", async () => {
     let _enteredMain = false;
-    let _session, _message;
+    let _message;
 
     const { env, topics } = getTopics({
       main: {
-        onEntry: async (session, message) => {
+        onEntry: async (context, message) => {
           _enteredMain = true;
-          _session = session;
           _message = message;
+          await exitTopic(context);
         }
       }
     });
@@ -32,20 +32,18 @@ describe("Wild yak", () => {
 
     await handler(session, message);
     _enteredMain.should.be.true();
-    _session.should.equal(session);
     _message.should.equal(message);
   });
 
 
   it("Runs a hook when pattern matches", async () => {
     let _enteredNickname = false;
-    let _session, _name;
+    let _name;
 
     const { env, topics } = getTopics({
       nickname: {
-        onEntry: async (session, name) => {
+        onEntry: async (context, name) => {
           _enteredNickname = true;
-          _session = session;
           _name = name;
         }
       }
@@ -58,7 +56,31 @@ describe("Wild yak", () => {
 
     await handler(session, message);
     _enteredNickname.should.be.true();
-    _session.should.equal(session);
     _name.should.equal("yakyak");
   });
+
+
+  it("Runs a hook when you write a mathematical calculation", async () => {
+    let _enteredMath = false;
+    let _result;
+
+    const { env, topics } = getTopics({
+      math: {
+        onEntry: async (context, result) => {
+          _enteredMath = true;
+          _result = result;
+        }
+      }
+    });
+
+    const message = { text: "5 + (6/2) + 10" };
+    const session = { id: "0943235" }
+
+    const handler = await init(topics);
+
+    await handler(session, message);
+    _enteredMath.should.be.true();
+    _result.should.equal(5 + (6/2) + 10);
+  });
+
 })
