@@ -1,4 +1,7 @@
 /* @flow */
+import fbFormatter from "./formatters/fb";
+import webFormatter from "./formatters/web";
+
 export type Topic = {
   patterns: Array<string>,
   hooks: Array<Function>,
@@ -22,6 +25,11 @@ export type PatternOptions = {}
 export type HookOptions = {}
 
 export type RegexHandler = (context: Context, matches: Array) => void
+
+const formatters = {
+  facebook: fbFormatter,
+  web: webFormatter
+}
 
 export function defPattern(name: string, patterns: Array<string>, handler: Function, options: Object) {
   const regexen = patterns.map(p => typeof p === "string" ? new RegExp(p) : p);
@@ -114,8 +122,14 @@ async function runHook(hook, context, message) {
 
 
 export async function init(topics: Topics) {
-  return async function(session, message) {
+
+  return async function({ sessionId, sessionType, user }, _message) {
+    const session = await libSession.get(sessionId, user);
+
+    const message = await formatters[sessionType].parseIncomingMessage(_message);
+
     session.topics = topics;
+
     const globalContext = {session, activeHooks:[], disabledHooks: []}
     if (!session.contexts) {
       session.contexts = [];
@@ -162,6 +176,8 @@ export async function init(topics: Topics) {
     }
 
     session.topics = undefined; //Do this since session is serialized for each user session. Topics is
+
+    await libSession.save(session);
 
     return handlerResult;
   }
