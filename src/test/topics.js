@@ -1,21 +1,51 @@
 import { defPattern, defHook, enterTopic, exitTopic, exitAllTopics } from "../wild-yak";
 
-export default function getTopics(opts = {}) {
-  opts.main = opts.main || { onEntry: (context, message) => {} };
-  opts.nickname = opts.nickname || {};
-  opts.math = opts.math || {};
+export default function getTopics() {
+  let env = {}
 
   const mainTopic = {
-    onEntry: opts.main.onEntry
+    onEntry: async (context, message) => {
+      env._enteredMain = true;
+      env._message = message;
+      await exitTopic(context);
+    }
   }
 
   const nicknameTopic = {
-    onEntry: opts.nickname.onEntry,
-    hooks: opts.nickname.hooks
+    onEntry: async (context, name) => {
+      env._enteredNickname = true;
+      env._name = name;
+    },
+    hooks: []
   }
 
   const mathTopic = {
-    onEntry: opts.math.onEntry,
+    onEntry: async (context, result) => {
+      env._enteredMath = true;
+      env._result = result;
+    }
+  }
+
+  const wildcardTopic = {
+    onEntry: async (context, message) => {
+      env._enteredWildcard = true;
+      env._message = message;
+      env._cb(context);
+    }
+  }
+
+  const mathExpTopic = {
+    onEntry: async (context, exp) => {
+      env._enteredMathExp = true;
+      env._exp = exp;
+    }
+  }
+
+  const defaultTopic = {
+    onEntry: async (context, message) => {
+      env._enteredDefault = true;
+      env._unknownMessage = message;
+    }
   }
 
   const globalTopic = {
@@ -45,6 +75,31 @@ export default function getTopics(opts = {}) {
           await enterTopic(session, "math", result);
         }
       ),
+      defPattern(
+        "wildcard",
+        [/^wildcard ([A-z].*)$/, /^wild ([A-z].*)$/],
+        async (session, {matches}) => {
+          await exitAllTopics(session);
+          await enterTopic(session, "wildcard", matches[1]);
+        }
+      ),
+      defPattern(
+        "mathexp",
+        [/^5 \+ 10$/, /^100\/4$/],
+        async (session, {matches}) => {
+          await exitAllTopics(session);
+          await enterTopic(session, "mathexp", matches[0]);
+        }
+      ),
+      defHook(
+        "default",
+        async (context, message) => {
+          return message
+        },
+        async (session, message) => {
+          await enterTopic(session, "default", message);
+        }
+      ),
     ]
   }
 
@@ -53,12 +108,15 @@ export default function getTopics(opts = {}) {
       "global": globalTopic,
       "main": mainTopic,
       "nickname": nicknameTopic,
-      "math": mathTopic
+      "math": mathTopic,
+      "wildcard": wildcardTopic,
+      "mathexp": mathExpTopic,
+      "default": defaultTopic
     }
   };
 
   return {
-    env: {},
+    env,
     topics
   };
 }
