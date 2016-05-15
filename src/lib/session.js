@@ -1,17 +1,17 @@
-const sessions = {};
+const yakSessions = {};
 
 export async function get(id) {
-  if (sessions[id]) {
-    const session = JSON.parse(sessions[id]);
-    if (session.contexts) {
-      session.contexts.forEach(c => c.session = session);
+  if (yakSessions[id]) {
+    const yakSession = JSON.parse(yakSessions[id]);
+    if (yakSession.contexts) {
+      yakSession.contexts.forEach(c => c.yakSession = yakSession);
     }
-    return session;
+    return yakSession;
   }
 }
 
-export async function save(session) {
-  const _contexts = session.contexts.map(c => Object.assign({}, c, { session: "" }));
-  const _session = Object.assign({}, session, { contexts: _contexts });
-  sessions[_session.id] = JSON.stringify(_session);
+export async function save(yakSession) {
+  const _contexts = yakSession.contexts.map(c => Object.assign({}, c, { yakSession: "" }));
+  const _yakSession = Object.assign({}, yakSession, { contexts: _contexts });
+  yakSessions[_yakSession.id] = JSON.stringify(_yakSession);
 }

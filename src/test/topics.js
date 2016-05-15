@@ -4,15 +4,15 @@ export default function getTopics() {
   let env = {}
 
   const mainTopic = {
-    onEntry: async ({context, extSession}, message) => {
+    onEntry: async ({context, session}, message) => {
       env._enteredMain = true;
       env._message = message;
-      await exitTopic({context, extSession});
+      await exitTopic({context, session});
     }
   }
 
   const nicknameTopic = {
-    onEntry: async ({context, extSession}, name) => {
+    onEntry: async ({context, session}, name) => {
       env._enteredNickname = true;
       env._name = name;
     },
@@ -20,29 +20,29 @@ export default function getTopics() {
   }
 
   const mathTopic = {
-    onEntry: async ({context, extSession}, result) => {
+    onEntry: async ({context, session}, result) => {
       env._enteredMath = true;
       env._result = result;
     }
   }
 
   const wildcardTopic = {
-    onEntry: async ({context, extSession}, message) => {
+    onEntry: async ({context, session}, message) => {
       env._enteredWildcard = true;
       env._message = message;
-      env._cb({context, extSession});
+      env._cb({context, session});
     }
   }
 
   const mathExpTopic = {
-    onEntry: async ({context, extSession}, exp) => {
+    onEntry: async ({context, session}, exp) => {
       env._enteredMathExp = true;
       env._exp = exp;
     }
   }
 
   const defaultTopic = {
-    onEntry: async ({context, extSession}, message) => {
+    onEntry: async ({context, session}, message) => {
       env._enteredDefault = true;
       env._unknownMessage = message;
     }
@@ -53,14 +53,14 @@ export default function getTopics() {
       defPattern(
         "nickname",
         [/^nick ([A-z]\w*)$/, /^nickname ([A-z]\w*)$/],
-        async ({context, extSession}, {matches}) => {
-          await exitAllTopics({context, extSession});
-          await enterTopic({context, extSession}, "nickname", matches[1])
+        async ({context, session}, {matches}) => {
+          await exitAllTopics({context, session});
+          await enterTopic({context, session}, "nickname", matches[1])
         }
       ),
       defHook(
         "calc",
-        async ({context, extSession}, message) => {
+        async ({context, session}, message) => {
           const regex = /^[0-9\(\)\+\-*/\s]+$/;
           if (regex.exec(message.text) !== null) {
             try {
@@ -70,34 +70,34 @@ export default function getTopics() {
             }
           }
         },
-        async ({context, extSession}, result) => {
-          await exitAllTopics({context, extSession});
-          await enterTopic({context, extSession}, "math", result);
+        async ({context, session}, result) => {
+          await exitAllTopics({context, session});
+          await enterTopic({context, session}, "math", result);
         }
       ),
       defPattern(
         "wildcard",
         [/^wildcard ([A-z].*)$/, /^wild ([A-z].*)$/],
-        async ({context, extSession}, {matches}) => {
-          await exitAllTopics({context, extSession});
-          await enterTopic({context, extSession}, "wildcard", matches[1]);
+        async ({context, session}, {matches}) => {
+          await exitAllTopics({context, session});
+          await enterTopic({context, session}, "wildcard", matches[1]);
         }
       ),
       defPattern(
         "mathexp",
         [/^5 \+ 10$/, /^100\/4$/],
-        async ({context, extSession}, {matches}) => {
-          await exitAllTopics({context, extSession});
-          await enterTopic({context, extSession}, "mathexp", matches[0]);
+        async ({context, session}, {matches}) => {
+          await exitAllTopics({context, session});
+          await enterTopic({context, session}, "mathexp", matches[0]);
         }
       ),
       defHook(
         "default",
-        async ({context, extSession}, message) => {
+        async ({context, session}, message) => {
           return message
         },
-        async ({context, extSession}, message) => {
-          await enterTopic({context, extSession}, "default", message);
+        async ({context, session}, message) => {
+          await enterTopic({context, session}, "default", message);
         }
       ),
     ]
