@@ -1,6 +1,7 @@
 /* @flow */
-import fbFormatter from "./formatters/fb";
-import webFormatter from "./formatters/web";
+import * as fbFormatter from "./formatters/fb";
+import * as webFormatter from "./formatters/web";
+import * as libSession from "./lib/session";
 
 export type Topic = {
   patterns: Array<string>,

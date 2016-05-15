@@ -1,8 +1,7 @@
 export function parseIncomingMessage(message) {
+  throw new Error("Not implemented");
 }
 
 export function formatOutgoingMessage(message) {
-  if (typeof message === "string") {
-    
-  }
+  throw new Error("Not implemented");
 }

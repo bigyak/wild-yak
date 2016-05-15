@@ -4,6 +4,11 @@ import { init, enterTopic, exitTopic } from "../wild-yak";
 import getTopics from "./topics";
 
 describe("Wild yak", () => {
+  const sessionData = {
+    sessionId: "666",
+    sessionType: "web",
+    user: { id: "iron_maiden", name: "Iron Maiden", firstName: "Iron", lastName: "Maiden" }
+  }
 
   it("init() returns a handler", async () => {
     const { env, topics } = getTopics();
@@ -30,7 +35,7 @@ describe("Wild yak", () => {
 
     const handler = await init(topics);
 
-    await handler(session, message);
+    await handler(sessionData, message);
     _enteredMain.should.be.true();
     _message.should.equal(message);
   });
@@ -54,7 +59,7 @@ describe("Wild yak", () => {
 
     const handler = await init(topics);
 
-    await handler(session, message);
+    await handler(sessionData, message);
     _enteredNickname.should.be.true();
     _name.should.equal("yakyak");
   });
@@ -78,7 +83,7 @@ describe("Wild yak", () => {
 
     const handler = await init(topics);
 
-    await handler(session, message);
+    await handler(sessionData, message);
     _enteredMath.should.be.true();
     _result.should.equal(5 + (6/2) + 10);
   });
