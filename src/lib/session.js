@@ -1,11 +1,13 @@
 const sessions = {};
 
 export async function get(id) {
-  const session = JSON.parse(sessions[id] || "{}");
-  if (session.contexts) {
-    session.contexts.forEach(c => c.session = session);    
+  if (sessions[id]) {
+    const session = JSON.parse(sessions[id]);
+    if (session.contexts) {
+      session.contexts.forEach(c => c.session = session);
+    }
+    return session;
   }
-  return session;
 }
 
 export async function save(session) {

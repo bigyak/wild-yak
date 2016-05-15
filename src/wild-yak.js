@@ -125,7 +125,7 @@ async function runHook(hook, context, message) {
 export async function init(topics: Topics) {
 
   return async function({ sessionId, sessionType, user }, _message) {
-    const session = await libSession.get(sessionId, user);
+    const session = (await libSession.get(sessionId)) || { id: sessionId, sessionType, user } ;
 
     const message = await formatters[sessionType].parseIncomingMessage(_message);
 
