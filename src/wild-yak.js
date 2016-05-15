@@ -86,11 +86,11 @@ export async function exitTopic(context, args) {
   const session = context.session;
   const lastContext = session.contexts.pop();
   if (session.contexts.length > 0) {
-    const parentTopic = session.topics.definitions[activeContext(session).topic];
+    const parentContext = activeContext(session);
+    const parentTopic = session.topics.definitions[parentContext.topic];
     if (lastContext.cb) {
-      await parentTopic[lastContext.cb](session, args)
+      return await parentTopic[lastContext.cb](parentContext, args);
     }
-    return parentTopic;
   }
 }
 
@@ -124,17 +124,17 @@ async function runHook(hook, context, message) {
 
 export async function init(topics: Topics) {
 
-  return async function({ sessionId, sessionType, user }, _message) {
-    const session = (await libSession.get(sessionId)) || { id: sessionId, sessionType, user } ;
+  return async function(extSession, _message) {
+    const session = (await libSession.get(extSession.id)) || { id: extSession.id, type: extSession.type, user: extSession.user } ;
 
-    const message = await formatters[sessionType].parseIncomingMessage(_message);
+    const message = await formatters[extSession.type].parseIncomingMessage(_message);
 
     session.topics = topics;
 
     const globalContext = {session, activeHooks:[], disabledHooks: []}
     if (!session.contexts) {
       session.contexts = [];
-      await enterTopic(globalContext, "main", message);
+      await enterTopic(globalContext, "main", message, extSession);
     }
     const context = activeContext(session);
 
@@ -148,7 +148,7 @@ export async function init(topics: Topics) {
 
       if (currentTopic.hooks) {
         for (let hook of currentTopic.hooks) {
-          [handled, handlerResult] = await runHook(hook, context, message);
+          [handled, handlerResult] = await runHook(hook, context, message, extSession);
           if (handled) {
             break;
           }
@@ -168,7 +168,7 @@ export async function init(topics: Topics) {
           (context.activeHooks.includes(hook.name) ||
           (context.activeHooks.length === 0 && !context.disabledHooks.includes(hook.name)))
         ) {
-          [handled, handlerResult] = await runHook(hook, context || globalContext, message);
+          [handled, handlerResult] = await runHook(hook, context || globalContext, message, extSession);
           if (handled) {
             break;
           }

@@ -4,9 +4,9 @@ import { init, disableHooks, disableHooksExcept } from "../wild-yak";
 import getTopics from "./topics";
 
 describe("Wild yak", () => {
-  const sessionData = {
-    sessionId: "666",
-    sessionType: "web",
+  const extSession = {
+    id: "666",
+    type: "web",
     user: { id: "iron_maiden", name: "Iron Maiden", firstName: "Iron", lastName: "Maiden" }
   }
 
@@ -25,7 +25,7 @@ describe("Wild yak", () => {
 
     const handler = await init(topics);
 
-    await handler(sessionData, message);
+    await handler(extSession, message);
     env._enteredMain.should.be.true();
     env._message.should.equal(message);
   });
@@ -39,7 +39,7 @@ describe("Wild yak", () => {
 
     const handler = await init(topics);
 
-    await handler(sessionData, message);
+    await handler(extSession, message);
     env._enteredNickname.should.be.true();
     env._name.should.equal("yakyak");
   });
@@ -53,7 +53,7 @@ describe("Wild yak", () => {
 
     const handler = await init(topics);
 
-    await handler(sessionData, message);
+    await handler(extSession, message);
     env._enteredMath.should.be.true();
     env._result.should.equal(5 + 10);
   });
@@ -67,7 +67,7 @@ describe("Wild yak", () => {
 
     const handler = await init(topics);
 
-    await handler(sessionData, message);
+    await handler(extSession, message);
     env._enteredDefault.should.be.true();
     env._unknownMessage.should.equal(message);
   });
@@ -83,11 +83,11 @@ describe("Wild yak", () => {
     env._cb = (context) => {
       disableHooks(context, ["nickname"]);
     }
-    await handler(sessionData, message);
+    await handler(extSession, message);
     env._enteredWildcard.should.be.true();
     env._message.should.equal("going to be alone");
 
-    await handler(sessionData, message2);
+    await handler(extSession, message2);
     env._enteredDefault.should.be.true();
     env._unknownMessage.should.equal(message2);
   });
@@ -103,14 +103,14 @@ describe("Wild yak", () => {
     env._cb = (context) => {
       disableHooksExcept(context, ["mathexp"]);
     }
-    await handler(sessionData, message);
+    await handler(extSession, message);
     env._enteredWildcard.should.be.true();
     env._message.should.equal("disableHooksExcept mathexp");
     env._cb = (context) => {
       disableHooksExcept(context, ["mathexp"]);
     }
 
-    await handler(sessionData, message2);
+    await handler(extSession, message2);
     env._enteredMathExp.should.be.true();
     env._exp.should.equal(message2.text);
   });
