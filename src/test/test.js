@@ -4,10 +4,13 @@ import { init, disableHooks, disableHooksExcept } from "../wild-yak";
 import getTopics from "./topics";
 
 describe("Wild yak", () => {
-  const extSession = {
-    id: "666",
-    type: "web",
-    user: { id: "iron_maiden", name: "Iron Maiden", firstName: "Iron", lastName: "Maiden" }
+
+  function getExtSession() {
+    return {
+      id: Math.random().toString(36).substring(16),
+      type: "web",
+      user: { id: "iron_maiden", name: "Iron Maiden", firstName: "Iron", lastName: "Maiden" }
+    }
   }
 
 
@@ -18,6 +21,7 @@ describe("Wild yak", () => {
   });
 
   it("Enters main::onEntry(session, message) while starting", async () => {
+    const extSession = getExtSession();
     const { env, topics } = getTopics();
 
     const message = { text: "Hello world" };
@@ -32,6 +36,7 @@ describe("Wild yak", () => {
 
 
   it("Runs a hook when pattern matches", async () => {
+    const extSession = getExtSession();
     const { env, topics } = getTopics();
 
     const message = { text: "nickname yakyak" };
@@ -46,6 +51,7 @@ describe("Wild yak", () => {
 
 
   it("Runs a hook when you write a mathematical calculation", async () => {
+    const extSession = getExtSession();
     const { env, topics } = getTopics();
 
     const message = { text: "5 + 10" };
@@ -60,6 +66,7 @@ describe("Wild yak", () => {
 
 
   it("Run the default on not matching any hook", async () => {
+    const extSession = getExtSession();
     const { env, topics } = getTopics();
 
     const message = { text: "somethingweird" };
@@ -74,13 +81,14 @@ describe("Wild yak", () => {
 
 
   it("Run default topic on disabling nickname hook", async () => {
+    const extSession = getExtSession();
     const { env, topics } = getTopics();
 
     const message = { text: "wildcard going to be alone" };
     const message2 = { text: "nickname yakyak" };
 
     const handler = await init(topics);
-    env._cb = (context) => {
+    env._cb = ({context, extSession}) => {
       disableHooks(context, ["nickname"]);
     }
     await handler(extSession, message);
@@ -94,21 +102,19 @@ describe("Wild yak", () => {
 
 
   it("Run mathexp topic on disableHooksExcept mathexp", async () => {
+    const extSession = getExtSession();
     const { env, topics } = getTopics();
 
     const message = { text: "wildcard disableHooksExcept mathexp" };
     const message2 = { text: "5 + 10" };
 
     const handler = await init(topics);
-    env._cb = (context) => {
+    env._cb = ({context, extSession}) => {
       disableHooksExcept(context, ["mathexp"]);
     }
     await handler(extSession, message);
     env._enteredWildcard.should.be.true();
     env._message.should.equal("disableHooksExcept mathexp");
-    env._cb = (context) => {
-      disableHooksExcept(context, ["mathexp"]);
-    }
 
     await handler(extSession, message2);
     env._enteredMathExp.should.be.true();

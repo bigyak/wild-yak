@@ -4,15 +4,15 @@ export default function getTopics() {
   let env = {}
 
   const mainTopic = {
-    onEntry: async (context, message, extSession) => {
+    onEntry: async ({context, extSession}, message) => {
       env._enteredMain = true;
       env._message = message;
-      await exitTopic(context);
+      await exitTopic({context, extSession});
     }
   }
 
   const nicknameTopic = {
-    onEntry: async (context, name, extSession) => {
+    onEntry: async ({context, extSession}, name) => {
       env._enteredNickname = true;
       env._name = name;
     },
@@ -20,29 +20,29 @@ export default function getTopics() {
   }
 
   const mathTopic = {
-    onEntry: async (context, result, extSession) => {
+    onEntry: async ({context, extSession}, result) => {
       env._enteredMath = true;
       env._result = result;
     }
   }
 
   const wildcardTopic = {
-    onEntry: async (context, message, extSession) => {
+    onEntry: async ({context, extSession}, message) => {
       env._enteredWildcard = true;
       env._message = message;
-      env._cb(context);
+      env._cb({context, extSession});
     }
   }
 
   const mathExpTopic = {
-    onEntry: async (context, exp, extSession) => {
+    onEntry: async ({context, extSession}, exp) => {
       env._enteredMathExp = true;
       env._exp = exp;
     }
   }
 
   const defaultTopic = {
-    onEntry: async (context, message, extSession) => {
+    onEntry: async ({context, extSession}, message) => {
       env._enteredDefault = true;
       env._unknownMessage = message;
     }
@@ -53,14 +53,14 @@ export default function getTopics() {
       defPattern(
         "nickname",
         [/^nick ([A-z]\w*)$/, /^nickname ([A-z]\w*)$/],
-        async (context, {matches}, extSession) => {
-          await exitAllTopics(context);
-          await enterTopic(context, "nickname", matches[1], extSession)
+        async ({context, extSession}, {matches}) => {
+          await exitAllTopics({context, extSession});
+          await enterTopic({context, extSession}, "nickname", matches[1])
         }
       ),
       defHook(
         "calc",
-        async (context, message) => {
+        async ({context, extSession}, message) => {
           const regex = /^[0-9\(\)\+\-*/\s]+$/;
           if (regex.exec(message.text) !== null) {
             try {
@@ -70,34 +70,34 @@ export default function getTopics() {
             }
           }
         },
-        async (context, result, extSession) => {
-          await exitAllTopics(context);
-          await enterTopic(context, "math", result, extSession);
+        async ({context, extSession}, result) => {
+          await exitAllTopics({context, extSession});
+          await enterTopic({context, extSession}, "math", result);
         }
       ),
       defPattern(
         "wildcard",
         [/^wildcard ([A-z].*)$/, /^wild ([A-z].*)$/],
-        async (context, {matches}, extSession) => {
-          await exitAllTopics(context);
-          await enterTopic(context, "wildcard", matches[1], extSession);
+        async ({context, extSession}, {matches}) => {
+          await exitAllTopics({context, extSession});
+          await enterTopic({context, extSession}, "wildcard", matches[1]);
         }
       ),
       defPattern(
         "mathexp",
         [/^5 \+ 10$/, /^100\/4$/],
-        async (context, {matches}, extSession) => {
-          await exitAllTopics(context);
-          await enterTopic(context, "mathexp", matches[0], extSession);
+        async ({context, extSession}, {matches}) => {
+          await exitAllTopics({context, extSession});
+          await enterTopic({context, extSession}, "mathexp", matches[0]);
         }
       ),
       defHook(
         "default",
-        async (context, message, extSession) => {
+        async ({context, extSession}, message) => {
           return message
         },
-        async (context, message, extSession) => {
-          await enterTopic(context, "default", message, extSession);
+        async ({context, extSession}, message) => {
+          await enterTopic({context, extSession}, "default", message);
         }
       ),
     ]

@@ -36,7 +36,7 @@ export function defPattern(name: string, patterns: Array<string>, handler: Funct
   const regexen = patterns.map(p => typeof p === "string" ? new RegExp(p) : p);
   return {
     name,
-    parse: async (context, message) => {
+    parse: async ({context, extSession}, message) => {
       const text = message.text;
       for (let i = 0; i < regexen.length; i++) {
         const matches = regexen[i].exec(text);
@@ -65,7 +65,7 @@ export function activeContext(session) {
 }
 
 
-export async function enterTopic(context, topic, args, cb) {
+export async function enterTopic({context, extSession}, topic, args, cb) {
   const session = context.session;
   const newContext = {
     topic,
@@ -76,26 +76,25 @@ export async function enterTopic(context, topic, args, cb) {
   };
   session.contexts.push(newContext);
   if (session.topics.definitions[topic].onEntry) {
-    await session.topics.definitions[topic].onEntry(newContext, args);
+    await session.topics.definitions[topic].onEntry({ context: newContext, extSession }, args);
   }
-  return newContext;
 }
 
 
-export async function exitTopic(context, args) {
+export async function exitTopic({context, extSession}, args) {
   const session = context.session;
   const lastContext = session.contexts.pop();
   if (session.contexts.length > 0) {
     const parentContext = activeContext(session);
     const parentTopic = session.topics.definitions[parentContext.topic];
     if (lastContext.cb) {
-      return await parentTopic[lastContext.cb](parentContext, args);
+      return await parentTopic[lastContext.cb]({context: parentContext, extSession}, args);
     }
   }
 }
 
 
-export async function exitAllTopics(context) {
+export async function exitAllTopics({context, extSession}) {
   const session = context.session;
   session.contexts = [];
 }
@@ -111,10 +110,10 @@ export async function disableHooks(context, list) {
 }
 
 
-async function runHook(hook, context, message) {
-  const parseResult = await hook.parse(context, message);
+async function runHook(hook, {context, extSession}, message) {
+  const parseResult = await hook.parse({context, extSession}, message);
   if (parseResult !== undefined) {
-    const handlerResult = await hook.handler(context, parseResult);
+    const handlerResult = await hook.handler({context, extSession}, parseResult);
     return [true, handlerResult];
   } else {
     return [false];
@@ -134,7 +133,7 @@ export async function init(topics: Topics) {
     const globalContext = {session, activeHooks:[], disabledHooks: []}
     if (!session.contexts) {
       session.contexts = [];
-      await enterTopic(globalContext, "main", message, extSession);
+      await enterTopic({ context: globalContext, extSession }, "main", message);
     }
     const context = activeContext(session);
 
@@ -148,7 +147,7 @@ export async function init(topics: Topics) {
 
       if (currentTopic.hooks) {
         for (let hook of currentTopic.hooks) {
-          [handled, handlerResult] = await runHook(hook, context, message, extSession);
+          [handled, handlerResult] = await runHook(hook, { context, extSession }, message);
           if (handled) {
             break;
           }
@@ -168,7 +167,7 @@ export async function init(topics: Topics) {
           (context.activeHooks.includes(hook.name) ||
           (context.activeHooks.length === 0 && !context.disabledHooks.includes(hook.name)))
         ) {
-          [handled, handlerResult] = await runHook(hook, context || globalContext, message, extSession);
+          [handled, handlerResult] = await runHook(hook, { context: (context || globalContext), extSession }, message);
           if (handled) {
             break;
           }
