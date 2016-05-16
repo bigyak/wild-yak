@@ -122,7 +122,7 @@ async function runHook(hook, {context, session}, message) {
 }
 
 
-export async function init(topics: Topics, { getSessionId, getSessionType }) {
+export function init(topics: Topics, { getSessionId, getSessionType }) {
 
   return async function(session, _message) {
     const yakSession = (await libSession.get(getSessionId(session))) || { id: getSessionId(session), type: getSessionType(session) } ;
