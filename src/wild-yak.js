@@ -33,6 +33,7 @@ const formatters = {
 }
 
 export function defPattern(name: string, patterns: Array<string>, handler: Function, options: Object) {
+  patterns = (patterns instanceof Array) ? patterns : [patterns];
   const regexen = patterns.map(p => typeof p === "string" ? new RegExp(p) : p);
   return {
     name,
@@ -76,7 +77,7 @@ export async function enterTopic({context, session}, topic, args, cb) {
   };
   yakSession.contexts.push(newContext);
   if (yakSession.topics.definitions[topic].onEntry) {
-    await yakSession.topics.definitions[topic].onEntry({ context: newContext, session }, args);
+    return await yakSession.topics.definitions[topic].onEntry({ context: newContext, session }, args);
   }
 }
 
@@ -130,46 +131,49 @@ export async function init(topics: Topics, { getSessionId, getSessionType }) {
 
     yakSession.topics = topics;
 
+    let handlerResult;
     const globalContext = {yakSession, activeHooks:[], disabledHooks: []}
     if (!yakSession.contexts) {
       yakSession.contexts = [];
-      await enterTopic({ context: globalContext, session }, "main", message);
+      handlerResult = await enterTopic({ context: globalContext, session }, "main", message);
     }
-    const context = activeContext(yakSession);
+    if (!handlerResult) {
+      const context = activeContext(yakSession);
 
-    const globalTopic = topics.definitions.global;
-    /*
-      Check the hooks in the local topic first.
-    */
-    let handlerResult = false, handled = false;
-    if (context) {
-      const currentTopic = topics.definitions[context.topic];
+      const globalTopic = topics.definitions.global;
+      /*
+        Check the hooks in the local topic first.
+      */
+      let handled = false;
+      if (context) {
+        const currentTopic = topics.definitions[context.topic];
 
-      if (currentTopic.hooks) {
-        for (let hook of currentTopic.hooks) {
-          [handled, handlerResult] = await runHook(hook, { context, session }, message);
-          if (handled) {
-            break;
+        if (currentTopic.hooks) {
+          for (let hook of currentTopic.hooks) {
+            [handled, handlerResult] = await runHook(hook, { context, session }, message);
+            if (handled) {
+              break;
+            }
           }
         }
       }
-    }
 
-    /*
-      If not found, try global topic.
-      While checking global topic,
-        if activeHooks array is defined, the hook must be in it.
-        if activeHooks is not defined, the hook must not be in disabledHooks
-    */
-    if (!handled && globalTopic.hooks) {
-      for (let hook of globalTopic.hooks) {
-        if (!context ||
-          (context.activeHooks.includes(hook.name) ||
-          (context.activeHooks.length === 0 && !context.disabledHooks.includes(hook.name)))
-        ) {
-          [handled, handlerResult] = await runHook(hook, { context: (context || globalContext), session }, message);
-          if (handled) {
-            break;
+      /*
+        If not found, try global topic.
+        While checking global topic,
+          if activeHooks array is defined, the hook must be in it.
+          if activeHooks is not defined, the hook must not be in disabledHooks
+      */
+      if (!handled && globalTopic.hooks) {
+        for (let hook of globalTopic.hooks) {
+          if (!context ||
+            (context.activeHooks.includes(hook.name) ||
+            (context.activeHooks.length === 0 && !context.disabledHooks.includes(hook.name)))
+          ) {
+            [handled, handlerResult] = await runHook(hook, { context: (context || globalContext), session }, message);
+            if (handled) {
+              break;
+            }
           }
         }
       }
