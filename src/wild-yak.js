@@ -179,10 +179,8 @@ export function init(topics: Topics, { getSessionId, getSessionType }) {
       }
     }
 
-    yakSession.topics = undefined; //Do this since yakSession is serialized for each user yakSession. Topics is
-
+    yakSession.topics = undefined; //Do this since yakSession is serialized for each user yakSession.
     await libSession.save(yakSession);
-
     return handlerResult;
   }
 }
