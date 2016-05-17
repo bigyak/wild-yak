@@ -8,6 +8,9 @@ export default function getTopics() {
       env._enteredMain = true;
       env._message = message;
       await exitTopic({context, session});
+      if (env._mainCB) {
+        return env._mainCB({context, session}, message);
+      }
     }
   }
 
@@ -38,6 +41,41 @@ export default function getTopics() {
     onEntry: async ({context, session}, exp) => {
       env._enteredMathExp = true;
       env._exp = exp;
+    }
+  }
+
+  async function onValidateName(_, {success, name}) {
+    console.log(JSON.stringify(name));
+    return `you signed up as ${name}.`;
+  }
+
+  const signupTopic = {
+    onEntry: async ({context, session}, message) => {
+      env._enteredSignup = true;
+      env._message = message;
+    },
+
+    onValidateName,
+
+    hooks: [
+      defPattern(
+        "validate",
+        /^name (.*)$/,
+        async ({context, session}, {matches}) => {
+          // await exitAllTopics({context, session});
+          return await enterTopic({context, session}, "validate", matches[1], onValidateName);
+        }
+      )
+    ],
+  }
+
+  const validateTopic = {
+    onEntry: async ({context, session}, name) => {
+      env._enteredValidate = true;
+      env._name = name;
+      const result = await exitTopic({context, session}, {success:true, name});
+      console.log(result);
+      return result;
     }
   }
 
@@ -91,6 +129,14 @@ export default function getTopics() {
           await enterTopic({context, session}, "mathexp", matches[0]);
         }
       ),
+      defPattern(
+        "signup",
+        [/^signup (.*)$/, /^100\/4$/],
+        async ({context, session}, {matches}) => {
+          await exitAllTopics({context, session});
+          await enterTopic({context, session}, "signup", matches[1]);
+        }
+      ),
       defHook(
         "default",
         async ({context, session}, message) => {
@@ -111,6 +157,8 @@ export default function getTopics() {
       "math": mathTopic,
       "wildcard": wildcardTopic,
       "mathexp": mathExpTopic,
+      "signup": signupTopic,
+      "validate": validateTopic,
       "default": defaultTopic
     }
   };

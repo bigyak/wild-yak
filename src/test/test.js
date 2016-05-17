@@ -30,7 +30,9 @@ describe("Wild yak", () => {
 
     const handler = await init(topics, {getSessionId, getSessionType});
 
-    await handler(session, message);
+    env._mainCB = ({}, message) => message;
+    const result = await handler(session, message);
+    result.should.equal(message);
     env._enteredMain.should.be.true();
     env._message.should.equal(message);
   });
@@ -117,6 +119,25 @@ describe("Wild yak", () => {
     await handler(session, message2);
     env._enteredMathExp.should.be.true();
     env._exp.should.equal(message2.text);
+  });
+
+
+  it("Receive result from sub topic via callback", async () => {
+    const session = getSession();
+    const { env, topics } = getTopics();
+
+    const message = { text: "signup Yak" };
+    const message2 = { text: "name Hemchand" };
+
+    const handler = await init(topics, {getSessionId, getSessionType});
+    await handler(session, message);
+    env._enteredSignup.should.be.true();
+    env._message.should.equal("Yak");
+
+    const output = await handler(session, message2);
+    env._enteredValidate.should.be.true();
+    env._name.should.equal('Hemchand');
+    output.should.equal('you signed up as Hemchand.')
   });
 
 })
