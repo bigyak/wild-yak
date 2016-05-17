@@ -75,9 +75,17 @@ export async function enterTopic({context, session}, topic, args, cb) {
     cb: cb ? { topic: context.topic, func: cb.name } : undefined,
     yakSession
   };
-  yakSession.contexts.push(newContext);
-  if (yakSession.topics.definitions[topic].onEntry) {
-    return await yakSession.topics.definitions[topic].onEntry({ context: newContext, session }, args);
+
+  const newTopic = yakSession.topics.definitions[topic];
+
+  if (newTopic.isRoot) {
+    yakSession.contexts = [newContext];
+  } else {
+    yakSession.contexts.push(newContext);
+  }
+
+  if (newTopic.onEntry) {
+    return await newTopic.onEntry({ context: newContext, session }, args);
   }
 }
 
@@ -94,7 +102,7 @@ export async function exitTopic({context, session}, args) {
 }
 
 
-export async function exitAllTopics({context, session}) {
+async function exitAllTopics({context, session}) {
   const yakSession = context.yakSession;
   yakSession.contexts = [];
 }

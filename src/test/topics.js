@@ -4,6 +4,7 @@ export default function getTopics() {
   let env = {}
 
   const mainTopic = {
+    isRoot: true,
     onEntry: async ({context, session}, message) => {
       env._enteredMain = true;
       env._message = message;
@@ -15,6 +16,7 @@ export default function getTopics() {
   }
 
   const nicknameTopic = {
+    isRoot: true,
     onEntry: async ({context, session}, name) => {
       env._enteredNickname = true;
       env._name = name;
@@ -24,6 +26,7 @@ export default function getTopics() {
   }
 
   const mathTopic = {
+    isRoot: true,
     onEntry: async ({context, session}, result) => {
       env._enteredMath = true;
       env._result = result;
@@ -32,6 +35,7 @@ export default function getTopics() {
   }
 
   const wildcardTopic = {
+    isRoot: true,
     onEntry: async ({context, session}, message) => {
       env._enteredWildcard = true;
       env._message = message;
@@ -41,6 +45,7 @@ export default function getTopics() {
   }
 
   const mathExpTopic = {
+    isRoot: true,
     onEntry: async ({context, session}, exp) => {
       env._enteredMathExp = true;
       env._exp = exp;
@@ -49,11 +54,11 @@ export default function getTopics() {
   }
 
   async function onValidateName(_, {success, name}) {
-    console.log(JSON.stringify(name));
     return `you signed up as ${name}.`;
   }
 
   const signupTopic = {
+    isRoot: true,
     onEntry: async ({context, session}, message) => {
       env._enteredSignup = true;
       env._message = message;
@@ -66,7 +71,6 @@ export default function getTopics() {
         "validate",
         /^name (.*)$/,
         async ({context, session}, {matches}) => {
-          // await exitAllTopics({context, session});
           return await enterTopic({context, session}, "validate", matches[1], onValidateName);
         }
       )
@@ -78,7 +82,6 @@ export default function getTopics() {
       env._enteredValidate = true;
       env._name = name;
       const result = await exitTopic({context, session}, {success:true, name});
-      console.log(result);
       return result;
     }
   }
@@ -97,7 +100,6 @@ export default function getTopics() {
         "nickname",
         [/^nick ([A-z]\w*)$/, /^nickname ([A-z]\w*)$/],
         async ({context, session}, {matches}) => {
-          await exitAllTopics({context, session});
           return await enterTopic({context, session}, "nickname", matches[1])
         }
       ),
@@ -114,7 +116,6 @@ export default function getTopics() {
           }
         },
         async ({context, session}, result) => {
-          await exitAllTopics({context, session});
           return await enterTopic({context, session}, "math", result);
         }
       ),
@@ -122,7 +123,6 @@ export default function getTopics() {
         "wildcard",
         [/^wildcard ([A-z].*)$/, /^wild ([A-z].*)$/],
         async ({context, session}, {matches}) => {
-          await exitAllTopics({context, session});
           return await enterTopic({context, session}, "wildcard", matches[1]);
         }
       ),
@@ -130,7 +130,6 @@ export default function getTopics() {
         "mathexp",
         [/^5 \+ 10$/, /^100\/4$/],
         async ({context, session}, {matches}) => {
-          await exitAllTopics({context, session});
           return await enterTopic({context, session}, "mathexp", matches[0]);
         }
       ),
@@ -138,7 +137,6 @@ export default function getTopics() {
         "signup",
         [/^signup (.*)$/, /^100\/4$/],
         async ({context, session}, {matches}) => {
-          await exitAllTopics({context, session});
           await enterTopic({context, session}, "signup", matches[1]);
         }
       ),
