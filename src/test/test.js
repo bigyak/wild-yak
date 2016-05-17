@@ -31,8 +31,8 @@ describe("Wild yak", () => {
     const handler = await init(topics, {getSessionId, getSessionType});
 
     env._mainCB = ({}, message) => message;
-    const result = await handler(session, message);
-    result.should.equal(message);
+    const results = await handler(session, message);
+    results[0].should.equal(message);
     env._enteredMain.should.be.true();
     env._message.should.equal(message);
   });
@@ -46,13 +46,14 @@ describe("Wild yak", () => {
 
     const handler = await init(topics, {getSessionId, getSessionType});
 
-    await handler(session, message);
+    const results = await handler(session, message);
     env._enteredNickname.should.be.true();
     env._name.should.equal("yakyak");
+    results[0].should.equal("in nickname");
   });
 
 
-  it("Runs a hook when you write a mathematical calculation", async () => {
+  it("Runs a custom hook (non-regex)", async () => {
     const session = getSession();
     const { env, topics } = getTopics();
 
@@ -60,13 +61,14 @@ describe("Wild yak", () => {
 
     const handler = await init(topics, {getSessionId, getSessionType});
 
-    await handler(session, message);
+    const results = await handler(session, message);
     env._enteredMath.should.be.true();
     env._result.should.equal(5 + 10);
+    results[0].should.equal("in math");
   });
 
 
-  it("Run the default on not matching any hook", async () => {
+  it("Run the default hook if nothing matches", async () => {
     const session = getSession();
     const { env, topics } = getTopics();
 
@@ -74,13 +76,14 @@ describe("Wild yak", () => {
 
     const handler = await init(topics, {getSessionId, getSessionType});
 
-    await handler(session, message);
+    const results = await handler(session, message);
     env._enteredDefault.should.be.true();
     env._unknownMessage.should.equal(message);
+    results[0].should.equal("in default");
   });
 
 
-  it("Run default topic on disabling nickname hook", async () => {
+  it("Disables hooks", async () => {
     const session = getSession();
     const { env, topics } = getTopics();
 
@@ -91,17 +94,19 @@ describe("Wild yak", () => {
     env._cb = ({context, session}) => {
       disableHooks(context, ["nickname"]);
     }
-    await handler(session, message);
+    const results1 = await handler(session, message);
     env._enteredWildcard.should.be.true();
     env._message.should.equal("going to be alone");
+    results1[0].should.equal("in wildcard");
 
-    await handler(session, message2);
+    const results2 = await handler(session, message2);
     env._enteredDefault.should.be.true();
     env._unknownMessage.should.equal(message2);
+    results2[0].should.equal("in default");
   });
 
 
-  it("Run mathexp topic on disableHooksExcept mathexp", async () => {
+  it("Disables hooks except specified hooks", async () => {
     const session = getSession();
     const { env, topics } = getTopics();
 
@@ -112,13 +117,15 @@ describe("Wild yak", () => {
     env._cb = ({context, session}) => {
       disableHooksExcept(context, ["mathexp"]);
     }
-    await handler(session, message);
+    const results1 = await handler(session, message);
     env._enteredWildcard.should.be.true();
     env._message.should.equal("disableHooksExcept mathexp");
+    results1[0].should.equal("in wildcard");
 
-    await handler(session, message2);
+    const results2 = await handler(session, message2);
     env._enteredMathExp.should.be.true();
     env._exp.should.equal(message2.text);
+    results2[0].should.equal("in mathexp");
   });
 
 
@@ -137,7 +144,7 @@ describe("Wild yak", () => {
     const output = await handler(session, message2);
     env._enteredValidate.should.be.true();
     env._name.should.equal('Hemchand');
-    output.should.equal('you signed up as Hemchand.')
+    output[0].should.equal('you signed up as Hemchand.')
   });
 
 })
