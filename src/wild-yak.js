@@ -121,66 +121,103 @@ async function runHook(hook, {context, session}, message) {
   }
 }
 
+async function processMessage(session, yakSession, message, topics) {
+  let handlerResult;
+  const globalContext = {yakSession, activeHooks:[], disabledHooks: []}
+  if (!yakSession.contexts) {
+    yakSession.contexts = [];
+    handlerResult = await enterTopic({ context: globalContext, session }, "main", message);
+  }
+  if (!handlerResult) {
+    const context = activeContext(yakSession);
 
-export function init(topics: Topics, { getSessionId, getSessionType }) {
+    const globalTopic = topics.definitions.global;
+    /*
+      Check the hooks in the local topic first.
+    */
+    let handled = false;
+    if (context) {
+      const currentTopic = topics.definitions[context.topic];
 
-  return async function(session, _message) {
-    const yakSession = (await libSession.get(getSessionId(session))) || { id: getSessionId(session), type: getSessionType(session) } ;
-
-    const message = await formatters[session.type].parseIncomingMessage(_message);
-
-    yakSession.topics = topics;
-
-    let handlerResult;
-    const globalContext = {yakSession, activeHooks:[], disabledHooks: []}
-    if (!yakSession.contexts) {
-      yakSession.contexts = [];
-      handlerResult = await enterTopic({ context: globalContext, session }, "main", message);
-    }
-    if (!handlerResult) {
-      const context = activeContext(yakSession);
-
-      const globalTopic = topics.definitions.global;
-      /*
-        Check the hooks in the local topic first.
-      */
-      let handled = false;
-      if (context) {
-        const currentTopic = topics.definitions[context.topic];
-
-        if (currentTopic.hooks) {
-          for (let hook of currentTopic.hooks) {
-            [handled, handlerResult] = await runHook(hook, { context, session }, message);
-            if (handled) {
-              break;
-            }
+      if (currentTopic.hooks) {
+        for (let hook of currentTopic.hooks) {
+          [handled, handlerResult] = await runHook(hook, { context, session }, message);
+          if (handled) {
+            break;
           }
         }
       }
+    }
 
-      /*
-        If not found, try global topic.
-        While checking global topic,
-          if activeHooks array is defined, the hook must be in it.
-          if activeHooks is not defined, the hook must not be in disabledHooks
-      */
-      if (!handled && globalTopic.hooks) {
-        for (let hook of globalTopic.hooks) {
-          if (!context ||
-            (context.activeHooks.includes(hook.name) ||
-            (context.activeHooks.length === 0 && !context.disabledHooks.includes(hook.name)))
-          ) {
-            [handled, handlerResult] = await runHook(hook, { context: (context || globalContext), session }, message);
-            if (handled) {
-              break;
-            }
+    /*
+      If not found, try global topic.
+      While checking global topic,
+        if activeHooks array is defined, the hook must be in it.
+        if activeHooks is not defined, the hook must not be in disabledHooks
+    */
+    if (!handled && globalTopic.hooks) {
+      for (let hook of globalTopic.hooks) {
+        if (!context ||
+          (context.activeHooks.includes(hook.name) ||
+          (context.activeHooks.length === 0 && !context.disabledHooks.includes(hook.name)))
+        ) {
+          [handled, handlerResult] = await runHook(hook, { context: (context || globalContext), session }, message);
+          if (handled) {
+            break;
           }
         }
+      }
+    }
+  }
+  return handlerResult;
+}
+
+export function init(topics: Topics, options) {
+
+  const getSessionId = options.getSessionId || (session => session.id);
+  const getSessionType = options.getSessionType || (session => session.type);
+  const messageOptions = options.messageOptions || {
+    strategy: "single"
+  };
+
+  return async function(session, messages) {
+    messages = messages instanceof Array ? messages : [messages];
+
+    const yakSession = (await libSession.get(getSessionId(session))) || { id: getSessionId(session), type: getSessionType(session) } ;
+    yakSession.topics = topics;
+
+    const results = [];
+
+    switch (messageOptions.strategy) {
+      //Process each message individually.
+      case "single": {
+        for (const _message of messages) {
+          const message = formatters[session.type].parseIncomingMessage(_message);
+          results.push(await processMessage(session, yakSession, message, topics));
+        }
+        break;
+      }
+      case "merge": {
+        const message = formatters[session.type].mergeIncomingMessages(messages);
+        results.push(await processMessage(session, yakSession, message, topics));
+      }
+      case "last": {
+        const message = formatters[session.type].parseIncomingMessage(messages.slice(-1)[0]);
+        results.push(await processMessage(session, yakSession, message, topics));
+      }
+      case "first": {
+        const message = formatters[session.type].parseIncomingMessage(messages[0]);
+        results.push(await processMessage(session, yakSession, message, topics));
+      }
+      case "custom": {
+        const parsedMessages = messages.map(m => formatters[session.type].parseIncomingMessage(m));
+        const customMessage = await messageOptions.messageParser(parsedMessages);
+        results.push(await processMessage(session, yakSession, customMessage, topics));
       }
     }
 
     yakSession.topics = undefined; //Do this since yakSession is serialized for each user yakSession.
     await libSession.save(yakSession);
-    return handlerResult;
+    return results;
   }
 }

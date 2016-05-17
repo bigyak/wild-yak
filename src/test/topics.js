@@ -15,6 +15,7 @@ export default function getTopics() {
     onEntry: async ({context, session}, name) => {
       env._enteredNickname = true;
       env._name = name;
+      return "in nickname";
     },
     hooks: []
   }
@@ -23,6 +24,7 @@ export default function getTopics() {
     onEntry: async ({context, session}, result) => {
       env._enteredMath = true;
       env._result = result;
+      return "in math";
     }
   }
 
@@ -31,6 +33,7 @@ export default function getTopics() {
       env._enteredWildcard = true;
       env._message = message;
       env._cb({context, session});
+      return "in wildcard";
     }
   }
 
@@ -38,6 +41,7 @@ export default function getTopics() {
     onEntry: async ({context, session}, exp) => {
       env._enteredMathExp = true;
       env._exp = exp;
+      return "in mathexp";
     }
   }
 
@@ -45,6 +49,7 @@ export default function getTopics() {
     onEntry: async ({context, session}, message) => {
       env._enteredDefault = true;
       env._unknownMessage = message;
+      return "in default";
     }
   }
 
@@ -55,7 +60,7 @@ export default function getTopics() {
         [/^nick ([A-z]\w*)$/, /^nickname ([A-z]\w*)$/],
         async ({context, session}, {matches}) => {
           await exitAllTopics({context, session});
-          await enterTopic({context, session}, "nickname", matches[1])
+          return await enterTopic({context, session}, "nickname", matches[1])
         }
       ),
       defHook(
@@ -72,7 +77,7 @@ export default function getTopics() {
         },
         async ({context, session}, result) => {
           await exitAllTopics({context, session});
-          await enterTopic({context, session}, "math", result);
+          return await enterTopic({context, session}, "math", result);
         }
       ),
       defPattern(
@@ -80,7 +85,7 @@ export default function getTopics() {
         [/^wildcard ([A-z].*)$/, /^wild ([A-z].*)$/],
         async ({context, session}, {matches}) => {
           await exitAllTopics({context, session});
-          await enterTopic({context, session}, "wildcard", matches[1]);
+          return await enterTopic({context, session}, "wildcard", matches[1]);
         }
       ),
       defPattern(
@@ -88,7 +93,7 @@ export default function getTopics() {
         [/^5 \+ 10$/, /^100\/4$/],
         async ({context, session}, {matches}) => {
           await exitAllTopics({context, session});
-          await enterTopic({context, session}, "mathexp", matches[0]);
+          return await enterTopic({context, session}, "mathexp", matches[0]);
         }
       ),
       defHook(
@@ -97,7 +102,7 @@ export default function getTopics() {
           return message
         },
         async ({context, session}, message) => {
-          await enterTopic({context, session}, "default", message);
+          return await enterTopic({context, session}, "default", message);
         }
       ),
     ]
