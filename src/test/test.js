@@ -1,6 +1,6 @@
 import __polyfill from "babel-polyfill";
 import should from "should";
-import { init, disableHooks, disableHooksExcept } from "../wild-yak";
+import { init, enterTopic, exitTopic, disableHooks, disableHooksExcept } from "../wild-yak";
 import getTopics from "./topics";
 
 describe("Wild yak", () => {
@@ -147,4 +147,52 @@ describe("Wild yak", () => {
     output[0].should.equal('you signed up as Hemchand.')
   });
 
+
+  it("Throws error on enterTopic if the caller context is not the top one", async () => {
+    const session = getSession();
+    const { env, topics } = getTopics();
+
+    const message = { text: "Hello world" };
+
+    const handler = await init(topics, {getSessionId, getSessionType});
+
+    env._mainCB = async ({context, session}, message) => {
+      return await enterTopic({context, session}, "signup", message, ({}, args) => args);
+    }
+    //await handler(session, message);
+    let _threwError = false;
+    try {
+      await handler(session, message);
+    } catch(e) {
+      _threwError = true;
+      e.message.should.equal("You can only add a callback from the top level topic");
+    }
+    _threwError.should.be.true();
+  });
+
+
+  it("Throws error on exitTopic if the caller context is not the top one", async () => {
+    const session = getSession();
+    const { env, topics } = getTopics();
+
+    const message = { text: "Hello world" };
+
+    const handler = await init(topics, {getSessionId, getSessionType});
+
+    env._mainCB = async ({context, session}, message) => {
+      await enterTopic({context, session}, "signup", message);
+      await exitTopic({context, session});
+    }
+
+    // await handler(session, message);
+    let _threwError = false;
+    try {
+      await handler(session, message);
+    } catch(e) {
+      _threwError = true;
+      e.message.should.equal("You can only exit from the top level topic");
+    }
+    _threwError.should.be.true();
+    // should.throws(async () => await handler(session, message), Error);
+  });
 })

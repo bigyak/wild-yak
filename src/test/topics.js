@@ -10,7 +10,7 @@ export default function getTopics() {
       env._message = message;
       await exitTopic({context, session});
       if (env._mainCB) {
-        return env._mainCB({context, session}, message);
+        return await env._mainCB({context, session}, message);
       }
     }
   }

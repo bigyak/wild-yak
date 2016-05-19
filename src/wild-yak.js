@@ -68,6 +68,9 @@ export function activeContext(yakSession) {
 
 export async function enterTopic({context, session}, topic, args, cb) {
   const yakSession = context.yakSession;
+  if (cb && context !== activeContext(yakSession)) {
+    throw new Error("You can only add a callback from the top level topic");
+  }
   const newContext = {
     topic,
     activeHooks: [],
@@ -92,6 +95,9 @@ export async function enterTopic({context, session}, topic, args, cb) {
 
 export async function exitTopic({context, session}, args) {
   const yakSession = context.yakSession;
+  if (context !== activeContext(yakSession)) {
+    throw new Error("You can only exit from the top level topic");
+  }
   const lastContext = yakSession.contexts.pop();
   if (yakSession.contexts.length > 0
     && lastContext.cb && activeContext(yakSession).topic === lastContext.cb.topic) {
