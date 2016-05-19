@@ -156,7 +156,7 @@ describe("Wild yak", () => {
 
     const handler = await init(topics, {getSessionId, getSessionType});
 
-    env._mainCB = async ({context, session}, message) => {
+    env._mainCB = async ({context, session}: StateType, message: StringMessageType) => {
       return await enterTopic({context, session}, "signup", message, ({}, args) => args);
     }
     //await handler(session, message);
@@ -165,7 +165,7 @@ describe("Wild yak", () => {
       await handler(session, message);
     } catch(e) {
       _threwError = true;
-      e.message.should.equal("You can only add a callback from the top level topic");
+      e.message.should.equal("You can only add a callback from the top level topic.");
     }
     _threwError.should.be.true();
   });
@@ -190,7 +190,7 @@ describe("Wild yak", () => {
       await handler(session, message);
     } catch(e) {
       _threwError = true;
-      e.message.should.equal("You can only exit from the top level topic");
+      e.message.should.equal("You can only exit from the top level topic.");
     }
     _threwError.should.be.true();
     // should.throws(async () => await handler(session, message), Error);
