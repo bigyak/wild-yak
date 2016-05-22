@@ -22,7 +22,7 @@ export function defTopic<TInitArgs, TContextData>(
   options: {
     isRoot?: boolean,
     hooks?: Array<HookType<TContextData, MessageType, Object, Object>>,
-    afterInit?: ?(state: StateType<TContextData>, session: ExternalSessionType) => void
+    afterInit?: ?(state: StateType<TContextData>, session: ExternalSessionType) => Promise
   }
 ) : TopicType<TInitArgs, TContextData> {
   return {

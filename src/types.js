@@ -24,7 +24,7 @@ export type TopicType<TInitArgs, TContextData> = {
   init: (args: TInitArgs, session: ExternalSessionType) => Promise<TContextData>,
   isRoot: boolean,
   hooks: Array<HookType<TContextData, Object, Object, MessageType>>,
-  afterInit?: ?(state: StateType<TContextData>, session: ExternalSessionType) => void
+  afterInit?: ?(state: StateType<TContextData>, session: ExternalSessionType) => Promise
 }
 
 /*
