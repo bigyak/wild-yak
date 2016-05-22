@@ -1,29 +1,38 @@
-import { defPattern, defHook, enterTopic, exitTopic } from "../wild-yak";
+import { defTopic, defPattern, defHook, enterTopic, exitTopic } from "../wild-yak";
 import type { TopicType, HookType, StringMessageType, RegexParseResultType, StateType } from "../types";
 
 export default function getTopics() {
   let env = {}
 
-  const mainTopic = {
-    name: "main",
-    isRoot: true,
-    init: async (state: StateType, message: StringMessageType) => {
+  const mainTopic = defTopic(
+    "main",
+    true,
+    async (x) => x,
+    async (state: StateType, message: StringMessageType) => {
       env._enteredMain = true;
       env._message = message;
-      await exitTopic(state);
+      await exitTopic(mainTopic, state);
       if (env._mainCB) {
         await env._mainCB(state, message);
       }
+    },
+    []
+  );
+
+  const nicknameTopic = defTopic(
+    "nickname",
+    true,
+
+    async (state: StateType, name: string) => {
+      env._enteredNickname = true;
+      env._name = name;
     }
-  }
+  )
 
   const nicknameTopic = {
     name: "nickname",
     isRoot: true,
-    init: async (state: StateType, name: string) => {
-      env._enteredNickname = true;
-      env._name = name;
-    }
+    init:
   }
 
   const mathTopic: TopicType<Object, string> = {

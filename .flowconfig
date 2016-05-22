@@ -6,6 +6,7 @@
 unsafe.enable_getters_and_setters=true
 
 [ignore]
+.*/dist/.*
 .*/coverage/.*
 .*/scripts/.*
 .*/node_modules/babylon/.*

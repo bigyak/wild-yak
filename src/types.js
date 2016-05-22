@@ -15,13 +15,13 @@ export type MessageType = StringMessageType | OptionMessageType;
 /*
   Definition of a Topic.
 */
-export type InitType<TInitArgs, TContext: ContextType> = (args: TInitArgs, session: ExternalSessionType) => Promise<TContext>;
-export type TopicType<TInitArgs, TContext: ContextType> = {
+export type InitType<TInitArgs, TContextData> = (args: TInitArgs, session: ExternalSessionType) => Promise<TContextData>;
+export type TopicType<TInitArgs, TContextData> = {
   name: string,
   isRoot: boolean,
-  init: InitType<TInitArgs, TContext>,
-  onEntry?: (state: StateType<TContext>) => void,
-  hooks?: Array<HookType<TContext, Object, Object, MessageType>>
+  init: InitType<TInitArgs, TContextData>,
+  onEntry?: (state: StateType<TContextData>) => void,
+  hooks?: Array<HookType<TContextData, Object, Object, MessageType>>
 }
 
 /*
@@ -37,10 +37,11 @@ export type YakSessionType = {
 /*
   The topic. This is where each topic stores its state.
 */
-export type ContextType = {
+export type ContextType<TContextData> = {
+  data?: TContextData,
   activeHooks: Array<string>,
   disabledHooks: Array<string>,
-  yakSession?: YakSessionType,
+  yakSession: YakSessionType,
   topic: TopicType,
   cb?: Function
 }
@@ -49,20 +50,20 @@ export type ContextType = {
   Parse a message. Takes in a message and returns a ParseResult.
   The ParseResult is passed on to the Handler.
 */
-export type TParse<TContext: ContextType, TMessage: MessageType, TParseResult> = (state: StateType<TContext>, message?: TMessage)  => Promise<?TParseResult>;
+export type TParse<TContextData, TMessage: MessageType, TParseResult> = (state: StateType<TContextData>, message?: TMessage)  => Promise<?TParseResult>;
 
 /*
   Recieves a ParseResult from the Parse() function. Handler can optionally return a result.
 */
-export type THandler<TContext: ContextType, THandlerArgs, THandlerResult> = (state: StateType<TContext>, args: THandlerArgs) => Promise<?THandlerResult>;
+export type THandler<TContextData, THandlerArgs, THandlerResult> = (state: StateType<TContextData>, args: THandlerArgs) => Promise<?THandlerResult>;
 
 /*
   The Hook. Contains a name, a parse(): TParse function, a handler(): THandler
 */
-export type HookType<TContext: ContextType, TMessage: MessageType, TParseResult, THandlerResult> = {
+export type HookType<TContextData, TMessage: MessageType, TParseResult, THandlerResult> = {
   name: string,
-  parse: TParse<TContext, TMessage, TParseResult>,
-  handler: THandler<TContext, TParseResult, THandlerResult>
+  parse: TParse<TContextData, TMessage, TParseResult>,
+  handler: THandler<TContextData, TParseResult, THandlerResult>
 };
 
 /*
@@ -71,8 +72,8 @@ export type HookType<TContext: ContextType, TMessage: MessageType, TParseResult,
   The external session helps the topic work with application state.
   eg: session.shoppingCart.items.count
 */
-export type StateType<TContext: ContextType> = {
-  context: TContext,
+export type StateType<TContextData> = {
+  context: ContextType<TContextData>,
   session: ExternalSessionType
 }
 
@@ -90,5 +91,5 @@ export type RegexParseResultType = {
   Called when exiting a topic.
   This is a selector for a method on the parentTopic
 */
-export type TopicExitCallback<TInitArgs, TContext: ContextType, TCallbackArgs, TCallbackResult> = (topic: TopicType<TInitArgs, TContext>) =>
-  THandler<TContext, TCallbackArgs, TCallbackResult>
+export type TopicExitCallback<TInitArgs, TContextData, TCallbackArgs, TCallbackResult> = (topic: TopicType<TInitArgs, TContextData>) =>
+  THandler<TContextData, TCallbackArgs, TCallbackResult>

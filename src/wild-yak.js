@@ -16,25 +16,26 @@ const formatters = {
 }
 
 
-export function defTopic<TInitArgs, TContext: ContextType>(
+export function defTopic<TInitArgs, TContextData, TEntryResult>(
   name: string,
   isRoot: boolean,
-  init: InitType<TInitArgs, TContext>,
-  hooks: Array<HookType<TContext, Object, Object, MessageType>>
-) : TopicType<TInitArgs, TContext> {
+  init: InitType<TInitArgs, TContextData>,
+  onEntry: (state: StateType<TContextData>) => TEntryResult,
+  hooks: Array<HookType<TContextData, MessageType, Object, Object>>
+) : TopicType<TInitArgs, TContextData> {
   return { name, isRoot, init, hooks };
 }
 
 
-export function defPattern<TInitArgs, TContext: ContextType, THandlerResult>(
-  topic: TopicType<TInitArgs, TContext>,
+export function defPattern<TInitArgs, TContextData, THandlerResult>(
+  topic: TopicType<TInitArgs, TContextData>,
   name: string,
   patterns: Array<RegExp>,
-  handler: THandler<TContext, RegexParseResultType, THandlerResult>
-) : HookType<TContext, StringMessageType, RegexParseResultType, THandlerResult> {
+  handler: THandler<TContextData, RegexParseResultType, THandlerResult>
+) : HookType<TContextData, StringMessageType, RegexParseResultType, THandlerResult> {
   return {
     name,
-    parse: async (state: StateType<TContext>, message: ?StringMessageType) : Promise<?RegexParseResultType> => {
+    parse: async (state: StateType<TContextData>, message: ?StringMessageType) : Promise<?RegexParseResultType> => {
       if (message) {
         const text = message.text;
         for (let i = 0; i < patterns.length; i++) {
@@ -50,12 +51,12 @@ export function defPattern<TInitArgs, TContext: ContextType, THandlerResult>(
 }
 
 
-export function defHook<TInitArgs, TContext: ContextType, TMessage: MessageType, TParseResult, THandlerResult>(
-  topic: TopicType<TInitArgs, TContext>,
+export function defHook<TInitArgs, TContextData, TMessage: MessageType, TParseResult, THandlerResult>(
+  topic: TopicType<TInitArgs, TContextData>,
   name: string,
-  parse: TParse<TContext, TMessage, TParseResult>,
-  handler: THandler<TContext, TParseResult, THandlerResult>
-) : HookType<TContext, TMessage, TParseResult, THandlerResult> {
+  parse: TParse<TContextData, TMessage, TParseResult>,
+  handler: THandler<TContextData, TParseResult, THandlerResult>
+) : HookType<TContextData, TMessage, TParseResult, THandlerResult> {
   return {
     name,
     parse,
@@ -74,21 +75,26 @@ function findTopic(name: string, topics: Array<TopicType>) : TopicType {
 }
 
 
-export async function enterTopic<TInitArgs, TContext: ContextType, TNewInitArgs, TNewContext: ContextType, TCallbackArgs, TCallbackResult>(
-  topic: TopicType<TInitArgs, TContext>,
+export async function enterTopic<TInitArgs, TContextData, TNewInitArgs, TNewContext: ContextType, TCallbackArgs, TCallbackResult>(
+  topic: TopicType<TInitArgs, TContextData>,
   state: StateType,
   newTopic: TopicType<TNewInitArgs, TNewContext>,
   args: TNewInitArgs,
-  cb?: TopicExitCallback<TInitArgs, TContext, TCallbackArgs, TCallbackResult>
+  cb?: TopicExitCallback<TInitArgs, TContextData, TCallbackArgs, TCallbackResult>
 ) : Promise {
   const currentContext = state.context;
   const session = state.session;
   const yakSession = currentContext.yakSession;
 
-  let newContext = await newTopic.init(args, session);
-  newContext.cb = cb;
-  newContext.yakSession = yakSession;
-  newContext.topic = newTopic;
+  let contextData = await newTopic.init(args, session);
+  const newContext = {
+    data: contextData,
+    topic: newTopic,
+    yakSession,
+    activeHooks: [],
+    disabledHooks: [],
+    cb
+  }
 
   if (newTopic.isRoot) {
     yakSession.contexts = [newContext];
@@ -102,8 +108,8 @@ export async function enterTopic<TInitArgs, TContext: ContextType, TNewInitArgs,
 }
 
 
-export async function exitTopic<TInitArgs, TContext>(
-  topic: TopicType<TInitArgs, TContext>,
+export async function exitTopic<TInitArgs, TContextData>(
+  topic: TopicType<TInitArgs, TContextData>,
   state: StateType,
   args: Object
 ) : Promise<?Object> {
@@ -115,9 +121,10 @@ export async function exitTopic<TInitArgs, TContext>(
 
   const lastContext = yakSession.contexts.pop();
 
-  if (lastContext.cb) {
+  if (lastContext.cb !== undefined) {
+    const cb: any = lastContext.cb; //keep flow happy. FIXME
     const parentContext = activeContext(yakSession);
-    return await lastContext.cb({ context: parentContext, session: state.session }, args);
+    return await cb({ context: parentContext, session: state.session }, args);
   }
 }
 
@@ -194,7 +201,7 @@ async function processMessage<TMessage: MessageType, THandlerResult>(
     for (let hook of globalTopic.hooks) {
       if (!context ||
         (context.activeHooks.includes(hook.name) ||
-        (context.activeHooks.length === 0 && !context.disabledHooks.includes(hook.name)))
+        (context.disabledHooks.length === 0 && !context.disabledHooks.includes(hook.name)))
       ) {
         [handled, handlerResult] = await runHook(hook, { context: (context || globalContext), session }, message);
         if (handled) {
