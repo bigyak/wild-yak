@@ -94,7 +94,7 @@ export async function enterTopic<TInitArgs, TContextData, TNewInitArgs, TNewCont
     activeHooks: [],
     disabledHooks: [],
     cb
-  }
+  };
 
   if (newTopic.isRoot) {
     yakSession.contexts = [newContext];
