@@ -34,7 +34,6 @@ export function defTopic<TInitArgs, TContextData>(
   };
 }
 
-
 export function defPattern<TInitArgs, TContextData, THandlerResult>(
   topic: TopicType<TInitArgs, TContextData>,
   name: string,
@@ -83,10 +82,10 @@ function findTopic(name: string, topics: Array<TopicType>) : TopicType {
 }
 
 
-export async function enterTopic<TInitArgs, TContextData, TNewInitArgs, TNewContext: ContextType, TCallbackArgs, TCallbackResult>(
+export async function enterTopic<TInitArgs, TContextData, TNewInitArgs, TNewContextData, TCallbackArgs, TCallbackResult>(
   topic: TopicType<TInitArgs, TContextData>,
   state: StateType,
-  newTopic: TopicType<TNewInitArgs, TNewContext>,
+  newTopic: TopicType<TNewInitArgs, TNewContextData>,
   args: TNewInitArgs,
   cb?: THandler<TContextData, TCallbackArgs, TCallbackResult>
 ) : Promise {
