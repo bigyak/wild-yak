@@ -2,6 +2,7 @@ import __polyfill from "babel-polyfill";
 import should from "should";
 import { init, enterTopic, exitTopic, disableHooks, disableHooksExcept } from "../wild-yak";
 import getTopics from "./topics";
+import * as libSession from "../lib/session";
 
 describe("Wild yak", () => {
 
@@ -22,17 +23,16 @@ describe("Wild yak", () => {
     handler.should.be.an.instanceOf(Function);
   });
 
-  it("Enters main::onEntry(session, message) while starting", async () => {
+  it("Enters main::init(session, message) while starting", async () => {
     const session = getSession();
     const { env, topics } = getTopics();
 
     const message = { text: "Hello world" };
 
     const handler = await init(topics, {getSessionId, getSessionType});
-
     env._mainCB = ({}, message) => message;
-    const results = await handler(session, message);
-    results[0].should.equal(message);
+    await handler(session, message);
+
     env._enteredMain.should.be.true();
     env._message.should.equal(message);
   });
@@ -45,11 +45,10 @@ describe("Wild yak", () => {
     const message = { text: "nickname yakyak" };
 
     const handler = await init(topics, {getSessionId, getSessionType});
+    await handler(session, message);
 
-    const results = await handler(session, message);
     env._enteredNickname.should.be.true();
     env._name.should.equal("yakyak");
-    results[0].should.equal("in nickname");
   });
 
 
@@ -59,12 +58,11 @@ describe("Wild yak", () => {
 
     const message = { text: "5 + 10" };
 
-    const handler = await init(topics, {getSessionId, getSessionType});
+    const handler = await init(topics, { getSessionId, getSessionType });
+    await handler(session, message);
 
-    const results = await handler(session, message);
     env._enteredMath.should.be.true();
     env._result.should.equal(5 + 10);
-    results[0].should.equal("in math");
   });
 
 
@@ -75,11 +73,10 @@ describe("Wild yak", () => {
     const message = { text: "somethingweird" };
 
     const handler = await init(topics, {getSessionId, getSessionType});
+    await handler(session, message);
 
-    const results = await handler(session, message);
     env._enteredDefault.should.be.true();
     env._unknownMessage.should.equal(message);
-    results[0].should.equal("in default");
   });
 
 
@@ -91,18 +88,18 @@ describe("Wild yak", () => {
     const message2 = { text: "nickname yakyak" };
 
     const handler = await init(topics, {getSessionId, getSessionType});
-    env._cb = ({context, session}) => {
+    env._cb = ({ context, session }) => {
       disableHooks(context, ["nickname"]);
     }
-    const results1 = await handler(session, message);
+
+    await handler(session, message);
+
     env._enteredWildcard.should.be.true();
     env._message.should.equal("going to be alone");
-    results1[0].should.equal("in wildcard");
 
-    const results2 = await handler(session, message2);
+    await handler(session, message2);
     env._enteredDefault.should.be.true();
     env._unknownMessage.should.equal(message2);
-    results2[0].should.equal("in default");
   });
 
 
@@ -114,18 +111,16 @@ describe("Wild yak", () => {
     const message2 = { text: "5 + 10" };
 
     const handler = await init(topics, {getSessionId, getSessionType});
-    env._cb = ({context, session}) => {
+    env._cb = ({ context, session }) => {
       disableHooksExcept(context, ["mathexp"]);
     }
-    const results1 = await handler(session, message);
+    await handler(session, message);
     env._enteredWildcard.should.be.true();
     env._message.should.equal("disableHooksExcept mathexp");
-    results1[0].should.equal("in wildcard");
 
-    const results2 = await handler(session, message2);
+    await handler(session, message2);
     env._enteredMathExp.should.be.true();
     env._exp.should.equal(message2.text);
-    results2[0].should.equal("in mathexp");
   });
 
 
@@ -141,10 +136,9 @@ describe("Wild yak", () => {
     env._enteredSignup.should.be.true();
     env._message.should.equal("Yak");
 
-    const output = await handler(session, message2);
+    await handler(session, message2);
     env._enteredValidate.should.be.true();
     env._name.should.equal('Hemchand');
-    output[0].should.equal('you signed up as Hemchand.')
   });
 
 
@@ -155,11 +149,10 @@ describe("Wild yak", () => {
     const message = { text: "Hello world" };
 
     const handler = await init(topics, {getSessionId, getSessionType});
-
-    env._mainCB = async ({context, session}: StateType, message: StringMessageType) => {
-      return await enterTopic({context, session}, "signup", message, ({}, args) => args);
+    env._mainCB = async ({ context, session }: StateType, message: StringMessageType) => {
+      await enterTopic({ context, session }, "signup", message, ({}, args) => args);
     }
-    //await handler(session, message);
+
     let _threwError = false;
     try {
       await handler(session, message);
@@ -179,9 +172,9 @@ describe("Wild yak", () => {
 
     const handler = await init(topics, {getSessionId, getSessionType});
 
-    env._mainCB = async ({context, session}, message) => {
-      await enterTopic({context, session}, "signup", message);
-      await exitTopic({context, session});
+    env._mainCB = async ({ context, session }, message) => {
+      await enterTopic({ context, session }, "signup", message);
+      await exitTopic({ context, session });
     }
 
     // await handler(session, message);

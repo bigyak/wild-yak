@@ -1,5 +1,7 @@
 /* @flow */
-import type { YakSessionType } from "../wild-yak";
+
+//FIXME: This is completely broken!
+import type { YakSessionType } from "../types";
 
 const yakSessions = {};
 
@@ -15,6 +17,6 @@ export async function get(id: string) : Promise<?YakSessionType> {
 
 export async function save(yakSession: YakSessionType) : Promise {
   const _contexts = yakSession.contexts.map(c => Object.assign({}, c, { yakSession: "" }));
-  const _yakSession = Object.assign({}, yakSession, { contexts: _contexts });
+  const _yakSession = Object.assign({}, yakSession, { contexts: _contexts, topics: undefined });
   yakSessions[_yakSession.id] = JSON.stringify(_yakSession);
 }

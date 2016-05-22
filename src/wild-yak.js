@@ -3,101 +3,63 @@ import * as fbFormatter from "./formatters/fb";
 import * as webFormatter from "./formatters/web";
 import * as libSession from "./lib/session";
 
+
+import type {
+  TopicType, InitType, TopicExitCallback, TParse, THandler, StringMessageType, MessageType, StateType, ContextType,
+  RegexParseResultType, HookType, ExternalSessionType, YakSessionType
+} from "./types";
+
+
 const formatters = {
   facebook: fbFormatter,
   web: webFormatter
 }
 
-export type TopicsType = {
-  definitions: {
-    [key: string]: TopicType
-  }
-}
 
-export type TopicType = {
-  hooks: Array<HookType<?Object, ?Object, Object>>
-}
-
-export type ExternalSessionType = Object;
-
-export type StringMessageType = { type: "string", text: string };
-export type OptionMessageType = { type: "option", values: Array<string> };
-export type MessageType = StringMessageType | OptionMessageType;
-
-export type ContextType = {
-  topic: string,
-  activeHooks: Array<string>,
-  disabledHooks: Array<string>,
-  cb?: ?{ topic: string, func: string },
-  yakSession: YakSessionType
-}
-
-export type YakSessionType = {
-  topics: TopicsType,
-  contexts: Array<ContextType>,
-  virgin: boolean
-}
-
-export type TParse<TParseResult, TMessage: MessageType> = (state: StateType, message: TMessage)  => Promise<?TParseResult>;
-export type THandler<TParseResult, THandlerResult> = (state: StateType, args: TParseResult) => Promise<THandlerResult>;
-
-export type HookType<TParseResult, THandlerResult, TMessage> = {
+export function defTopic<TInitArgs, TContext: ContextType>(
   name: string,
-  parse: TParse<TParseResult, TMessage>,
-  handler: THandler<TParseResult, THandlerResult>,
-  options?: Object
-};
-
-export type PatternType = string | RegExp;
-
-export type StateType = {
-  context: ContextType,
-  session: ExternalSessionType
+  isRoot: boolean,
+  init: InitType<TInitArgs, TContext>,
+  hooks: Array<HookType<TContext, Object, Object, MessageType>>
+) : TopicType<TInitArgs, TContext> {
+  return { name, isRoot, init, hooks };
 }
 
-export type TopicCallback<TArgs, TResult> = (state: StateType, result: TArgs) => TResult;
 
-export type RegexParseResultType = {
-  message: StringMessageType,
-  i: number,
-  matches: Array<string>
-}
-
-export function defPattern<TMessage: StringMessageType, TPattern: PatternType, THandlerResult>(
+export function defPattern<TInitArgs, TContext: ContextType, THandlerResult>(
+  topic: TopicType<TInitArgs, TContext>,
   name: string,
-  _patterns: Array<TPattern>,
-  handler: THandler<RegexParseResultType, THandlerResult>,
-  options?: Object
-) : HookType<RegexParseResultType, THandlerResult, TMessage> {
-  const patterns : Array<TPattern> = _patterns instanceof Array ? _patterns : [_patterns];
-  const regexen: Array<RegExp> = patterns.map(p => typeof p === "string" ? new RegExp(p) : p);
+  patterns: Array<RegExp>,
+  handler: THandler<TContext, RegexParseResultType, THandlerResult>
+) : HookType<TContext, StringMessageType, RegexParseResultType, THandlerResult> {
   return {
     name,
-    parse: async ({context: ContextType, session: ExternalSessionType}, message: TMessage) : Promise<?RegexParseResultType> => {
-      const text = message.text;
-      for (let i = 0; i < regexen.length; i++) {
-        const matches = regexen[i].exec(text);
-        if (matches !== null) {
-          return {message, i, matches};
+    parse: async (state: StateType<TContext>, message: ?StringMessageType) : Promise<?RegexParseResultType> => {
+      if (message) {
+        const text = message.text;
+        for (let i = 0; i < patterns.length; i++) {
+          const matches = patterns[i].exec(text);
+          if (matches !== null) {
+            return {message, i, matches};
+          }
         }
       }
     },
-    handler,
-    options
+    handler
   };
 }
 
-export function defHook<TParseResult, THandlerResult, TMessage: MessageType>(
+
+export function defHook<TInitArgs, TContext: ContextType, TMessage: MessageType, TParseResult, THandlerResult>(
+  topic: TopicType<TInitArgs, TContext>,
   name: string,
-  parse: TParse<TParseResult, TMessage>,
-  handler: THandler<TParseResult, THandlerResult>,
-  options?: Object
-) : HookType<TParseResult, THandlerResult, TMessage> {
+  parse: TParse<TContext, TMessage, TParseResult>,
+  handler: THandler<TContext, TParseResult, THandlerResult>
+) : HookType<TContext, TMessage, TParseResult, THandlerResult> {
   return {
     name,
     parse,
-    handler,
-    options
+    handler
   };
 }
 
@@ -107,25 +69,26 @@ export function activeContext(yakSession: YakSessionType) : ContextType {
 }
 
 
-export async function enterTopic<TArgs, TCallbackArgs, TResult>(
-  {context, session}: StateType,
-  topic: string,
-  args: TArgs,
-  cb?: TopicCallback<TCallbackArgs, TResult>
-) {
-  const yakSession = context.yakSession;
-  if (cb && context !== activeContext(yakSession)) {
-    throw new Error("You can only add a callback from the top level topic.");
-  }
-  const newContext: ContextType = {
-    topic,
-    activeHooks: [],
-    disabledHooks: [],
-    cb: cb ? { topic: context.topic, func: cb.name } : undefined,
-    yakSession
-  };
+function findTopic(name: string, topics: Array<TopicType>) : TopicType {
+  return topics.filter(t => t.name === name)[0]
+}
 
-  const newTopic: TopicType = yakSession.topics.definitions[topic];
+
+export async function enterTopic<TInitArgs, TContext: ContextType, TNewInitArgs, TNewContext: ContextType, TCallbackArgs, TCallbackResult>(
+  topic: TopicType<TInitArgs, TContext>,
+  state: StateType,
+  newTopic: TopicType<TNewInitArgs, TNewContext>,
+  args: TNewInitArgs,
+  cb?: TopicExitCallback<TInitArgs, TContext, TCallbackArgs, TCallbackResult>
+) : Promise {
+  const currentContext = state.context;
+  const session = state.session;
+  const yakSession = currentContext.yakSession;
+
+  let newContext = await newTopic.init(args, session);
+  newContext.cb = cb;
+  newContext.yakSession = yakSession;
+  newContext.topic = newTopic;
 
   if (newTopic.isRoot) {
     yakSession.contexts = [newContext];
@@ -134,32 +97,28 @@ export async function enterTopic<TArgs, TCallbackArgs, TResult>(
   }
 
   if (newTopic.onEntry) {
-    return await newTopic.onEntry({ context: newContext, session }, args);
+    return await newTopic.onEntry({ context: newContext, session: state.session });
   }
 }
 
 
-export async function exitTopic<TArgs, TResult>(
-  {context, session}: StateType,
-  args: TArgs
-) : Promise<?TResult> {
-  const yakSession = context.yakSession;
-  if (context !== activeContext(yakSession)) {
-    throw new Error("You can only exit from the top level topic.");
+export async function exitTopic<TInitArgs, TContext>(
+  topic: TopicType<TInitArgs, TContext>,
+  state: StateType,
+  args: Object
+) : Promise<?Object> {
+  const yakSession = state.context.yakSession;
+
+  if (state.context !== activeContext(yakSession)) {
+    throw new Error("You can only exit from the current topic.");
   }
+
   const lastContext = yakSession.contexts.pop();
-  if (yakSession.contexts.length > 0 && lastContext.cb && activeContext(yakSession).topic === lastContext.cb.topic) {
-    const cb: { topic: string, func: string } = lastContext.cb;
+
+  if (lastContext.cb) {
     const parentContext = activeContext(yakSession);
-    const parentTopic = yakSession.topics.definitions[cb.topic];
-    return await parentTopic[cb.func]({context: parentContext, session}, args);
+    return await lastContext.cb({ context: parentContext, session: state.session }, args);
   }
-}
-
-
-async function exitAllTopics({context, session}: StateType) : Promise {
-  const yakSession = context.yakSession;
-  yakSession.contexts = [];
 }
 
 
@@ -173,73 +132,78 @@ export function disableHooks(context: ContextType, list: Array<string>) : void {
 }
 
 
-async function runHook(hook: HookType, {context, session}: StateType, message: MessageType) {
-  const parseResult = await hook.parse({context, session}, message);
+async function runHook(hook: HookType, state: StateType, message?: MessageType) {
+  const { context, session } = state;
+  const parseResult = await hook.parse(state, message);
   if (parseResult !== undefined) {
-    const handlerResult = await hook.handler({context, session}, parseResult);
+    const handlerResult = await hook.handler(state, parseResult);
     return [true, handlerResult];
   } else {
     return [false, undefined];
   }
 }
 
-async function processMessage<THandlerResult, TMessage: MessageType>(
+
+async function processMessage<TMessage: MessageType, THandlerResult>(
   session: ExternalSessionType,
-  yakSession: YakSessionType,
   message: TMessage,
-  topics: TopicsType
+  yakSession: YakSessionType
 ) : Promise<?THandlerResult> {
   let handlerResult: ?THandlerResult;
 
-  const globalContext = { yakSession, activeHooks:[], disabledHooks: [], topic: "global" };
+  const globalTopic = findTopic("global", yakSession.topics);
+  const globalContext = { yakSession, activeHooks:[], disabledHooks: [], topic: globalTopic };
 
   if (yakSession.virgin) {
-    yakSession.contexts = [];
-    handlerResult = await enterTopic({ context: globalContext, session }, "main", message);
     yakSession.virgin = false;
+    const mainTopic = findTopic("main", yakSession.topics);
+    await enterTopic(
+      globalTopic,
+      { context: globalContext, session },
+      mainTopic,
+      message
+    );
   }
 
-  if (typeof handlerResult === "undefined") {
-    const context = activeContext(yakSession);
-    const globalTopic = topics.definitions.global;
+  const context = activeContext(yakSession);
 
-    /*
-      Check the hooks in the local topic first.
-    */
-    let handled = false;
-    if (context) {
-      const currentTopic = topics.definitions[context.topic];
+  /*
+    Check the hooks in the local topic first.
+  */
+  let handled = false;
+  if (context) {
+    const currentTopic = findTopic(context.topic.name, yakSession.topics);
 
-      if (currentTopic.hooks) {
-        for (let hook of currentTopic.hooks) {
-          [handled, handlerResult] = await runHook(hook, { context, session }, message);
-          if (handled) {
-            break;
-          }
-        }
-      }
-    }
-
-    /*
-      If not found, try global topic.
-      While checking global topic,
-        if activeHooks array is defined, the hook must be in it.
-        if activeHooks is not defined, the hook must not be in disabledHooks
-    */
-    if (!handled && globalTopic.hooks) {
-      for (let hook of globalTopic.hooks) {
-        if (!context ||
-          (context.activeHooks.includes(hook.name) ||
-          (context.activeHooks.length === 0 && !context.disabledHooks.includes(hook.name)))
-        ) {
-          [handled, handlerResult] = await runHook(hook, { context: (context || globalContext), session }, message);
-          if (handled) {
-            break;
-          }
+    if (currentTopic.hooks) {
+      for (let hook of currentTopic.hooks) {
+        [handled, handlerResult] = await runHook(hook, { context, session }, message);
+        if (handled) {
+          break;
         }
       }
     }
   }
+
+  /*
+    If not found, try global topic.
+    While checking global topic,
+      if activeHooks array is defined, the hook must be in it.
+      if activeHooks is not defined, the hook must not be in disabledHooks
+  */
+  if (!handled && globalTopic.hooks) {
+    for (let hook of globalTopic.hooks) {
+      if (!context ||
+        (context.activeHooks.includes(hook.name) ||
+        (context.activeHooks.length === 0 && !context.disabledHooks.includes(hook.name)))
+      ) {
+        [handled, handlerResult] = await runHook(hook, { context: (context || globalContext), session }, message);
+        if (handled) {
+          break;
+        }
+      }
+    }
+  }
+
   return handlerResult;
 }
 
@@ -258,8 +222,7 @@ type InitOptionsType = {
 
 type TopicsHandler = (session: ExternalSessionType, messages: Array<MessageType> | MessageType) => Object
 
-export function init(topics: TopicsType, options: InitOptionsType) : TopicsHandler {
-
+export function init(topics: Array<TopicType>, options: InitOptionsType) : TopicsHandler {
   const getSessionId = options.getSessionId || (session => session.id);
   const getSessionType = options.getSessionType || (session => session.type);
   const messageOptions = options.messageOptions || {
@@ -280,7 +243,7 @@ export function init(topics: TopicsType, options: InitOptionsType) : TopicsHandl
       case "single": {
         for (const _message of messages) {
           const message = formatters[session.type].parseIncomingMessage(_message);
-          const result = await processMessage(session, yakSession, message, topics);
+          const result = await processMessage(session, message, yakSession);
           if (result) {
             results.push(result);
           }
@@ -289,7 +252,7 @@ export function init(topics: TopicsType, options: InitOptionsType) : TopicsHandl
       }
       case "merge": {
         const message = formatters[session.type].mergeIncomingMessages(messages);
-        const result = await processMessage(session, yakSession, message, topics);
+        const result = await processMessage(session, message, yakSession);
         if (result) {
           results.push(result);
         }
@@ -297,7 +260,7 @@ export function init(topics: TopicsType, options: InitOptionsType) : TopicsHandl
       }
       case "last": {
         const message = formatters[session.type].parseIncomingMessage(messages.slice(-1)[0]);
-        const result = await processMessage(session, yakSession, message, topics);
+        const result = await processMessage(session, message, yakSession);
         if (result) {
           results.push(result);
         }
@@ -305,7 +268,7 @@ export function init(topics: TopicsType, options: InitOptionsType) : TopicsHandl
       }
       case "first": {
         const message = formatters[session.type].parseIncomingMessage(messages[0]);
-        const result = await processMessage(session, yakSession, message, topics);
+        const result = await processMessage(session, message, yakSession);
         if (result) {
           results.push(result);
         }
@@ -314,7 +277,7 @@ export function init(topics: TopicsType, options: InitOptionsType) : TopicsHandl
       case "custom": {
         const parsedMessages = messages.map(m => formatters[session.type].parseIncomingMessage(m));
         const customMessage = await messageOptions.messageParser(parsedMessages);
-        const result = await processMessage(session, yakSession, customMessage, topics);
+        const result = await processMessage(session, customMessage, yakSession);
         if (result) {
           results.push(result);
         }

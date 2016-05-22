@@ -1,5 +1,5 @@
 /* @flow */
-import type { MessageType } from "../wild-yak";
+import type { MessageType } from "../types";
 
 export function mergeIncomingMessages<TMessage : MessageType>(messages: Array<Object>) : TMessage {
   throw new Error("Not implemented");
