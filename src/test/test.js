@@ -25,16 +25,14 @@ describe("Wild yak", () => {
 
   it("Enters main::init(session, message) while starting", async () => {
     const session = getSession();
-    const { env, topics } = getTopics();
+    const { env, topics } = getTopics({ includeMain: true });
 
     const message = { text: "Hello world" };
 
     const handler = await init(topics, {getSessionId, getSessionType});
-    env._mainCB = ({}, message) => message;
     await handler(session, message);
 
-    env._enteredMain.should.be.true();
-    env._message.should.equal(message);
+    env._enteredMain.should.be.true("Entered main");
   });
 
 
@@ -47,8 +45,7 @@ describe("Wild yak", () => {
     const handler = await init(topics, {getSessionId, getSessionType});
     await handler(session, message);
 
-    env._enteredNickname.should.be.true();
-    env._name.should.equal("yakyak");
+    env._enteredNickname.should.be.true("Entered nickname");
   });
 
 
@@ -61,8 +58,7 @@ describe("Wild yak", () => {
     const handler = await init(topics, { getSessionId, getSessionType });
     await handler(session, message);
 
-    env._enteredMath.should.be.true();
-    env._result.should.equal(5 + 10);
+    env._enteredMath.should.be.true("Entered math");
   });
 
 
@@ -75,8 +71,7 @@ describe("Wild yak", () => {
     const handler = await init(topics, {getSessionId, getSessionType});
     await handler(session, message);
 
-    env._enteredDefault.should.be.true();
-    env._unknownMessage.should.equal(message);
+    env._enteredDefault.should.be.true("Entered default");
   });
 
 
@@ -88,18 +83,27 @@ describe("Wild yak", () => {
     const message2 = { text: "nickname yakyak" };
 
     const handler = await init(topics, {getSessionId, getSessionType});
-    env._cb = ({ context, session }) => {
-      disableHooks(context, ["nickname"]);
-    }
 
     await handler(session, message);
+    env._enteredWildcard.should.be.true("Entered wildcard");
+  });
 
-    env._enteredWildcard.should.be.true();
-    env._message.should.equal("going to be alone");
+
+  it("Runs a hook for each message", async () => {
+    const session = getSession();
+    const { env, topics } = getTopics();
+
+    const message = { text: "wildcard going to be alone" };
+    const message2 = { text: "nickname yakyak" };
+
+    const handler = await init(topics, {getSessionId, getSessionType});
+
+    env._disabled = ["nickname"];
+    await handler(session, message);
+    env._enteredWildcard.should.be.true("Entered wildcard");
 
     await handler(session, message2);
-    env._enteredDefault.should.be.true();
-    env._unknownMessage.should.equal(message2);
+    env._enteredDefault.should.be.true("Entered default");
   });
 
 
@@ -111,16 +115,13 @@ describe("Wild yak", () => {
     const message2 = { text: "5 + 10" };
 
     const handler = await init(topics, {getSessionId, getSessionType});
-    env._cb = ({ context, session }) => {
-      disableHooksExcept(context, ["mathexp"]);
-    }
+
+    env._enabled = ["mathexp"];
     await handler(session, message);
-    env._enteredWildcard.should.be.true();
-    env._message.should.equal("disableHooksExcept mathexp");
+    env._enteredWildcard.should.be.true("Entered wildcard");
 
     await handler(session, message2);
-    env._enteredMathExp.should.be.true();
-    env._exp.should.equal(message2.text);
+    env._enteredMathExp.should.be.true("Entered mathexp");
   });
 
 
@@ -133,59 +134,51 @@ describe("Wild yak", () => {
 
     const handler = await init(topics, {getSessionId, getSessionType});
     await handler(session, message);
-    env._enteredSignup.should.be.true();
-    env._message.should.equal("Yak");
+    env._enteredSignup.should.be.true("Entered signup");
 
     await handler(session, message2);
-    env._enteredValidate.should.be.true();
-    env._name.should.equal('Hemchand');
+    env._enteredValidate.should.be.true("Entered signup");
+    env._enteredOnValidateName.should.be.true();
   });
 
 
-  it("Throws error on enterTopic if the caller context is not the top one", async () => {
+  it("Throws error on enterTopic() if the provided context isn't on the top of the stack", async () => {
     const session = getSession();
-    const { env, topics } = getTopics();
+    const { env, topics } = getTopics({ includeMain: true });
 
     const message = { text: "Hello world" };
 
-    const handler = await init(topics, {getSessionId, getSessionType});
-    env._mainCB = async ({ context, session }: StateType, message: StringMessageType) => {
-      await enterTopic({ context, session }, "signup", message, ({}, args) => args);
-    }
+    const handler = await init(topics, { getSessionId, getSessionType });
 
+    env.enterTopic_assertTopContextTest = true;
     let _threwError = false;
     try {
       await handler(session, message);
     } catch(e) {
       _threwError = true;
-      e.message.should.equal("You can only add a callback from the top level topic.");
+      e.message.should.equal("You can only enter a new context from the last context.");
     }
     _threwError.should.be.true();
   });
 
 
-  it("Throws error on exitTopic if the caller context is not the top one", async () => {
+  it("Throws error on exitTopic() if the provided context isn't on the top of the stack", async () => {
     const session = getSession();
-    const { env, topics } = getTopics();
+    const { env, topics } = getTopics({ includeMain: true });
 
     const message = { text: "Hello world" };
 
-    const handler = await init(topics, {getSessionId, getSessionType});
+    const handler = await init(topics, { getSessionId, getSessionType });
 
-    env._mainCB = async ({ context, session }, message) => {
-      await enterTopic({ context, session }, "signup", message);
-      await exitTopic({ context, session });
-    }
-
-    // await handler(session, message);
+    env.exitTopic_assertTopContextTest = true;
     let _threwError = false;
     try {
       await handler(session, message);
     } catch(e) {
       _threwError = true;
-      e.message.should.equal("You can only exit from the top level topic.");
+      e.message.should.equal("You can only exit from the current context.");
     }
     _threwError.should.be.true();
-    // should.throws(async () => await handler(session, message), Error);
   });
+
 })

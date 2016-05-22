@@ -15,13 +15,16 @@ export type MessageType = StringMessageType | OptionMessageType;
 /*
   Definition of a Topic.
 */
-export type InitType<TInitArgs, TContextData> = (args: TInitArgs, session: ExternalSessionType) => Promise<TContextData>;
+export type TopicParams<TContextData> = {
+  isRoot: boolean,
+  hooks: Array<HookType<TContextData, Object, Object, MessageType>>
+}
 export type TopicType<TInitArgs, TContextData> = {
   name: string,
+  init: (args: TInitArgs, session: ExternalSessionType) => Promise<TContextData>,
   isRoot: boolean,
-  init: InitType<TInitArgs, TContextData>,
-  onEntry?: (state: StateType<TContextData>) => void,
-  hooks?: Array<HookType<TContextData, Object, Object, MessageType>>
+  hooks: Array<HookType<TContextData, Object, Object, MessageType>>,
+  afterInit?: ?(state: StateType<TContextData>, session: ExternalSessionType) => void
 }
 
 /*
@@ -86,10 +89,3 @@ export type RegexParseResultType = {
   i: number,
   matches: Array<string>
 }
-
-/*
-  Called when exiting a topic.
-  This is a selector for a method on the parentTopic
-*/
-export type TopicExitCallback<TInitArgs, TContextData, TCallbackArgs, TCallbackResult> = (topic: TopicType<TInitArgs, TContextData>) =>
-  THandler<TContextData, TCallbackArgs, TCallbackResult>
