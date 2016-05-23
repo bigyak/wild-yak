@@ -23,7 +23,7 @@ describe("Wild yak", () => {
     handler.should.be.an.instanceOf(Function);
   });
 
-  it("Enters main::init(session, message) while starting", async () => {
+  it("Enters topic main while starting", async () => {
     const session = getSession();
     const { env, topics } = getTopics({ includeMain: true });
 
@@ -36,7 +36,35 @@ describe("Wild yak", () => {
   });
 
 
-  it("Runs a hook when pattern matches", async () => {
+  it("Returns a message from a pattern", async () => {
+    const session = getSession();
+    const { env, topics } = getTopics({ includeMain: true });
+
+    const message = { text: "Hello world" };
+
+    const handler = await init(topics, {getSessionId, getSessionType});
+    const result = await handler(session, message);
+
+    env._enteredMain.should.be.true("Entered main");
+    result[0].should.equal("hey, what's up!");
+  });
+
+
+  it("Returns a message from a hook", async () => {
+    const session = getSession();
+    const { env, topics } = getTopics({ includeMain: true });
+
+    const message = { text: "Boomshanker" };
+
+    const handler = await init(topics, {getSessionId, getSessionType});
+    const result = await handler(session, message);
+
+    env._enteredMain.should.be.true("Entered main");
+    result[0].should.equal("omg zomg!");
+  });
+
+
+  it("Runs a topic when pattern matches", async () => {
     const session = getSession();
     const { env, topics } = getTopics();
 

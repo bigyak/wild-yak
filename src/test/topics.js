@@ -27,7 +27,29 @@ export default function getTopics(options) {
           env._mainState = state;
           await enterTopic(mainTopic, state, nicknameTopic)
         }
-      }
+      },
+      hooks: [
+        defPattern(
+          mainTopic,
+          "respond-to-hello",
+          [/^Hello (.*)$/],
+          async (state, { matches }) => {
+            return "hey, what's up!";
+          }
+        ),
+        defHook(
+          mainTopic,
+          "boomshanker",
+          async (state, message) => {
+            if (message.text === "Boomshanker") {
+              return "zomg!"
+            }
+          },
+          async (state, zomg) => {
+            return `omg ${zomg}`;
+          }
+        )
+      ]
     }
   );
 
