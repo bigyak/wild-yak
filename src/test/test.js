@@ -153,19 +153,21 @@ describe("Wild yak", () => {
   });
 
 
-  it("Receive result from sub topic via callback", async () => {
+  it("Receives result from sub topic via callback", async () => {
     const session = getSession();
     const { env, topics } = getTopics();
 
     const message = { text: "signup Yak" };
-    const message2 = { text: "name Hemchand" };
+    const message2 = { text: "name" };
+    const message3 = { text: "name Hemchand" };
 
     const handler = await init(topics, {getSessionId, getSessionType});
     await handler(session, message);
     env._enteredSignup.should.be.true("Entered signup");
 
     await handler(session, message2);
-    env._enteredValidate.should.be.true("Entered signup");
+    await handler(session, message3);
+    env._enteredValidate.should.be.true("Executed onValidatename");
     env._enteredOnValidateName.should.be.true();
   });
 

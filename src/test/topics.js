@@ -127,11 +127,14 @@ export default function getTopics(options) {
     },
     {
       isRoot: true,
+      callbacks: {
+        onValidateName
+      },
       hooks: [
         defPattern(
           signupTopic,
           "validate",
-          [/^name (.*)$/],
+          [/^name$/],
           async (state, { matches }) => {
             await enterTopic(
               signupTopic,
@@ -152,9 +155,16 @@ export default function getTopics(options) {
       env._enteredValidate = true;
     },
     {
-      afterInit: async (state) => {
-        await exitTopic(validateTopic, state, { success: true });
-      }
+      hooks: [
+        defPattern(
+          signupTopic,
+          "validate",
+          [/^name (.*)$/],
+          async (state, { matches }) => {
+            await exitTopic(validateTopic, state, { success: true });
+          }
+        )
+      ]
     }
   );
 

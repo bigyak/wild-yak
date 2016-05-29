@@ -22,6 +22,7 @@ export function defTopic<TInitArgs, TContextData>(
   options: {
     isRoot?: boolean,
     hooks?: Array<HookType<TContextData, MessageType, Object, Object>>,
+    callbacks?: Array<(state: StateType<TContextData>, params: any) => Promise>,
     afterInit?: ?(state: StateType<TContextData>, session: ExternalSessionType) => Promise
   }
 ) : TopicType<TInitArgs, TContextData> {
@@ -29,6 +30,7 @@ export function defTopic<TInitArgs, TContextData>(
     name,
     isRoot: options.isRoot !== undefined ? options.isRoot : false,
     init,
+    callbacks: options.callbacks,
     hooks: options.hooks || [],
     afterInit: options.afterInit
   };
@@ -102,6 +104,7 @@ export async function enterTopic<TInitArgs, TContextData, TNewInitArgs, TNewCont
   const newContext = {
     data: await newTopic.init(args, session),
     topic: newTopic,
+    parentTopic: topic,
     yakSession,
     activeHooks: [],
     disabledHooks: [],
@@ -241,7 +244,7 @@ export function init(allTopics: Array<TopicType>, options: InitOptionsType) : To
   return async function(session: ExternalSessionType, _messages: Array<MessageType> | MessageType) : Promise<Array<Object>> {
     const messages = _messages instanceof Array ? _messages : [_messages];
 
-    const savedSession = await libSession.get(getSessionId(session));
+    const savedSession = await libSession.get(getSessionId(session), topics);
     const yakSession = savedSession ? { ...savedSession, topics } :
       { id: getSessionId(session), type: getSessionType(session), contexts: [], virgin: true, topics };
 
@@ -309,7 +312,6 @@ export function init(allTopics: Array<TopicType>, options: InitOptionsType) : To
       default:
         throw new Error("Unknown message type.")
     }
-
     await libSession.save(yakSession);
     return results;
   }
