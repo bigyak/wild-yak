@@ -6,10 +6,20 @@ export function mergeIncomingMessages(messages: Array<WebIncomingMessageType>) :
 }
 
 export function parseIncomingMessage(message: WebIncomingMessageType) : IncomingMessageType {
-  return {
-    type: "string",
-    timestamp: message.timestamp,
-    text: typeof message.text !== "undefined" ? message.text : ""
+  if (message.text) {
+    return {
+      type: "string",
+      timestamp: message.timestamp,
+      text: message.text || ""
+    }
+  } else if (message.attachments) {
+    return {
+      type: "media",
+      timestamp: message.timestamp,
+      attachments: message.attachments.map(a => ({ url: a.url }))
+    }
+  } else {
+    throw new Error("Unsupported message type");
   }
 }
 

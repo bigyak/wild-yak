@@ -8,13 +8,15 @@ export type ExternalSessionType = Object;
 /*
   Message types that will be passed to the Yak
 */
-export type IncomingStringMessageType = {
-  type: "string",
-  text: string,
-  timestamp: number
-};
-export type IncomingMessageType = IncomingStringMessageType;
+type IncomingMessageBaseType = { timestamp: number }
+export type IncomingStringMessageType = IncomingMessageBaseType & { type: "string", text: string };
+type IncomingMediaType = { url: string }
+export type IncomingMediaMessageType = IncomingMessageBaseType & { type: "media", attachments: Array<IncomingMediaType> }
+export type IncomingMessageType = IncomingStringMessageType | IncomingMediaMessageType;
 
+/*
+  Messages that the yak will receive from the handlers.
+*/
 export type OutgoingStringMessageType = { type: "string", text: string };
 export type OptionMessageType = { type: "option", values: Array<string> };
 export type OutgoingMessageType = OutgoingStringMessageType | OptionMessageType;
@@ -122,13 +124,17 @@ type FbIncomingMessageBaseType = {
   }
 };
 export type FbIncomingStringMessageType = FbIncomingMessageBaseType & { message: { text: string } }
-export type FbIncomingMessageType = FbIncomingStringMessageType;
+type FbMediaAttachmentType = { type: string, payload: { url: string } };
+export type FbIncomingMediaMessageType = FbIncomingMessageBaseType & { message: { attachments: Array<FbMediaAttachmentType> } }
+export type FbIncomingMessageType = FbIncomingStringMessageType | FbIncomingMediaMessageType;
 
 type WebIncomingMessageBaseType = {
   timestamp: number
 };
-export type WebIncomingStringMessageType = WebIncomingMessageBaseType & { text?: ?string };
-export type WebIncomingMessageType = WebIncomingStringMessageType;
+export type WebIncomingStringMessageType = WebIncomingMessageBaseType & { text: string };
+type WebMediaAttachmentType = { type: string, url: string };
+export type WebIncomingMediaMessageType = WebIncomingMessageBaseType & { message: { attachments: Array<WebMediaAttachmentType> } }
+export type WebIncomingMessageType = WebIncomingStringMessageType | WebIncomingMediaMessageType;
 
 export type ExternalIncomingMessageType = FbIncomingMessageType | WebIncomingMessageType;
 
