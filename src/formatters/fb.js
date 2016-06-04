@@ -1,21 +1,18 @@
 /* @flow */
-import type { IncomingMessageType, OutgoingMessageType } from "../types";
+import type { IncomingMessageType, OutgoingMessageType, FbIncomingMessageType, FbOutgoingMessageType } from "../types";
 
-export function mergeIncomingMessages<TMessage : IncomingMessageType>(messages: Array<any>) : TMessage {
+export function mergeIncomingMessages(messages: Array<FbIncomingMessageType>) : IncomingMessageType {
   throw new Error("Not implemented");
 }
 
-export function parseIncomingMessage<TMessage : IncomingMessageType>(message: any) : TMessage {
-  const _message: TMessage = message;
-  if (message.postback) {
-    _message.isPostback = true;
-    _message.text = message.postback.payload;
-  } else {
-    _message.isPostback = false;
+export function parseIncomingMessage(message: FbIncomingMessageType) : IncomingMessageType {
+  return {
+    type: "string",
+    timestamp: message.timestamp,
+    text: message.message.text ? message.message.text : (message.postback ? message.postback.payload : "")
   }
-  return _message;
 }
 
-export function formatOutgoingMessage<TMessage : OutgoingMessageType>(message: any) : TMessage {
+export function formatOutgoingMessage(message: OutgoingMessageType) : FbOutgoingMessageType {
   throw new Error("Not implemented");
 }

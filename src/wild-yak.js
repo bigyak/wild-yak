@@ -5,7 +5,7 @@ import * as libSession from "./lib/session";
 
 
 import type {
-  TopicType, TParse, THandler, HandlerResultType, IncomingStringMessageType, IncomingMessageType, OutgoingMessageType, StateType, ContextType,
+  TopicType, ParseFuncType, HandlerFuncType, HandlerResultType, IncomingStringMessageType, ExternalIncomingMessageType, IncomingMessageType, OutgoingMessageType, StateType, ContextType,
   RegexParseResultType, HookType, ExternalSessionType, YakSessionType
 } from "./types";
 
@@ -40,7 +40,7 @@ export function defPattern<TInitArgs, TContextData, THandlerResult>(
   topic: TopicType<TInitArgs, TContextData>,
   name: string,
   patterns: Array<RegExp>,
-  handler: THandler<TContextData, RegexParseResultType, THandlerResult>
+  handler: HandlerFuncType<TContextData, RegexParseResultType, THandlerResult>
 ) : HookType<TContextData, IncomingStringMessageType, RegexParseResultType, THandlerResult> {
   return {
     name,
@@ -63,8 +63,8 @@ export function defPattern<TInitArgs, TContextData, THandlerResult>(
 export function defHook<TInitArgs, TContextData, TMessage: IncomingMessageType, TParseResult, THandlerResult>(
   topic: TopicType<TInitArgs, TContextData>,
   name: string,
-  parse: TParse<TContextData, TMessage, TParseResult>,
-  handler: THandler<TContextData, TParseResult, THandlerResult>
+  parse: ParseFuncType<TContextData, TMessage, TParseResult>,
+  handler: HandlerFuncType<TContextData, TParseResult, THandlerResult>
 ) : HookType<TContextData, TMessage, TParseResult, THandlerResult> {
   return {
     name,
@@ -89,7 +89,7 @@ export async function enterTopic<TInitArgs, TContextData, TNewInitArgs, TNewCont
   state: StateType,
   newTopic: TopicType<TNewInitArgs, TNewContextData>,
   args: TNewInitArgs,
-  cb?: THandler<TContextData, TCallbackArgs, TCallbackResult>
+  cb?: HandlerFuncType<TContextData, TCallbackArgs, TCallbackResult>
 ) : Promise {
   const currentContext = state.context;
   const session = state.session;
@@ -229,7 +229,7 @@ type InitOptionsType = {
   )
 }
 
-type TopicsHandler = (session: ExternalSessionType, messages: Array<IncomingMessageType> | IncomingMessageType) => Object
+type TopicsHandler = (session: ExternalSessionType, messages: Array<ExternalIncomingMessageType> | ExternalIncomingMessageType) => Object
 
 export function init(allTopics: Array<TopicType>, options: InitOptionsType) : TopicsHandler {
   const globalTopic = findTopic("global", allTopics);
@@ -241,7 +241,10 @@ export function init(allTopics: Array<TopicType>, options: InitOptionsType) : To
     strategy: "last"
   };
 
-  return async function(session: ExternalSessionType, _messages: Array<IncomingMessageType> | IncomingMessageType) : Promise<Array<OutgoingMessageType>> {
+  return async function(
+    session: ExternalSessionType,
+    _messages: Array<ExternalIncomingMessageType> | ExternalIncomingMessageType
+  ) : Promise<Array<OutgoingMessageType>> {
     const messages = _messages instanceof Array ? _messages : [_messages];
 
     const savedSession = await libSession.get(getSessionId(session), topics);
