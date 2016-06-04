@@ -1,7 +1,7 @@
 /* @flow */
 
 //FIXME: This is completely broken!
-import type { YakSessionType } from "../types";
+import type { TopicType, YakSessionType } from "../types";
 
 const yakSessions = {};
 
@@ -15,7 +15,7 @@ export async function get(id: string, topics: Array<TopicType>) : Promise<?YakSe
         yakSession,
         topic,
         parentTopic,
-        cb: c.cb ? parentTopic.callbacks[c.cb] : undefined
+        cb: c.cb && parentTopic.callbacks ? parentTopic.callbacks[c.cb] : undefined
       };
       return Object.assign({}, c, ctxParams);
     });

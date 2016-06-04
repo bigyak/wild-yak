@@ -8,22 +8,26 @@ export type ExternalSessionType = Object;
 /*
   Message types that will be passed to the Yak
 */
-export type StringMessageType = { type: "string", text: string };
+export type IncomingStringMessageType = { type: "string", text: string, isPostback: boolean };
+export type IncomingMessageType = IncomingStringMessageType;
+
+export type OutgoingStringMessageType = { type: "string", text: string };
 export type OptionMessageType = { type: "option", values: Array<string> };
-export type MessageType = StringMessageType | OptionMessageType;
+export type OutgoingMessageType = OutgoingStringMessageType | OptionMessageType;
 
 /*
   Definition of a Topic.
 */
 export type TopicParams<TContextData> = {
   isRoot: boolean,
-  hooks: Array<HookType<TContextData, Object, Object, MessageType>>
+  hooks: Array<HookType<TContextData, Object, Object, IncomingMessageType>>
 }
 export type TopicType<TInitArgs, TContextData> = {
   name: string,
   init: (args: TInitArgs, session: ExternalSessionType) => Promise<TContextData>,
   isRoot: boolean,
-  hooks: Array<HookType<TContextData, Object, Object, MessageType>>,
+  callbacks?: ?Array<(state: any, params: any) => Promise>,
+  hooks: Array<HookType<TContextData, Object, Object, IncomingMessageType>>,
   afterInit?: ?(state: StateType<TContextData>, session: ExternalSessionType) => Promise
 }
 
@@ -53,7 +57,7 @@ export type ContextType<TContextData> = {
   Parse a message. Takes in a message and returns a ParseResult.
   The ParseResult is passed on to the Handler.
 */
-export type TParse<TContextData, TMessage: MessageType, TParseResult> = (state: StateType<TContextData>, message?: TMessage)  => Promise<?TParseResult>;
+export type TParse<TContextData, TMessage: IncomingMessageType, TParseResult> = (state: StateType<TContextData>, message?: TMessage)  => Promise<?TParseResult>;
 
 /*
   Recieves a ParseResult from the Parse() function. Handler can optionally return a result.
@@ -63,7 +67,7 @@ export type THandler<TContextData, THandlerArgs, THandlerResult> = (state: State
 /*
   The Hook. Contains a name, a parse(): TParse function, a handler(): THandler
 */
-export type HookType<TContextData, TMessage: MessageType, TParseResult, THandlerResult> = {
+export type HookType<TContextData, TMessage: IncomingMessageType, TParseResult, THandlerResult> = {
   name: string,
   parse: TParse<TContextData, TMessage, TParseResult>,
   handler: THandler<TContextData, TParseResult, THandlerResult>
@@ -85,7 +89,12 @@ export type StateType<TContextData> = {
   Contains original message, index of matched pattern, and a list of matches.
 */
 export type RegexParseResultType = {
-  message: StringMessageType,
+  message: IncomingStringMessageType,
   i: number,
   matches: Array<string>
 }
+
+/*
+  A handler can return a single response or an array of responses.
+*/
+export type HandlerResultType = OutgoingMessageType | Array<OutgoingMessageType>;

@@ -5,7 +5,7 @@ import * as libSession from "./lib/session";
 
 
 import type {
-  TopicType, TParse, THandler, StringMessageType, MessageType, StateType, ContextType,
+  TopicType, TParse, THandler, HandlerResultType, IncomingStringMessageType, IncomingMessageType, OutgoingMessageType, StateType, ContextType,
   RegexParseResultType, HookType, ExternalSessionType, YakSessionType
 } from "./types";
 
@@ -21,7 +21,7 @@ export function defTopic<TInitArgs, TContextData>(
   init: (args: TInitArgs, session: ExternalSessionType) => Promise<TContextData>,
   options: {
     isRoot?: boolean,
-    hooks?: Array<HookType<TContextData, MessageType, Object, Object>>,
+    hooks?: Array<HookType<TContextData, IncomingMessageType, Object, Object>>,
     callbacks?: Array<(state: StateType<TContextData>, params: any) => Promise>,
     afterInit?: ?(state: StateType<TContextData>, session: ExternalSessionType) => Promise
   }
@@ -41,10 +41,10 @@ export function defPattern<TInitArgs, TContextData, THandlerResult>(
   name: string,
   patterns: Array<RegExp>,
   handler: THandler<TContextData, RegexParseResultType, THandlerResult>
-) : HookType<TContextData, StringMessageType, RegexParseResultType, THandlerResult> {
+) : HookType<TContextData, IncomingStringMessageType, RegexParseResultType, THandlerResult> {
   return {
     name,
-    parse: async (state: StateType<TContextData>, message: ?StringMessageType) : Promise<?RegexParseResultType> => {
+    parse: async (state: StateType<TContextData>, message: ?IncomingStringMessageType) : Promise<?RegexParseResultType> => {
       if (message) {
         const text = message.text;
         for (let i = 0; i < patterns.length; i++) {
@@ -60,7 +60,7 @@ export function defPattern<TInitArgs, TContextData, THandlerResult>(
 }
 
 
-export function defHook<TInitArgs, TContextData, TMessage: MessageType, TParseResult, THandlerResult>(
+export function defHook<TInitArgs, TContextData, TMessage: IncomingMessageType, TParseResult, THandlerResult>(
   topic: TopicType<TInitArgs, TContextData>,
   name: string,
   parse: TParse<TContextData, TMessage, TParseResult>,
@@ -154,7 +154,7 @@ export function disableHooks(state: StateType, list: Array<string>) : void {
 }
 
 
-async function runHook(hook: HookType, state: StateType, message?: MessageType) {
+async function runHook(hook: HookType, state: StateType, message?: IncomingMessageType) : Promise<[boolean, ?HandlerResultType]> {
   const { context, session } = state;
   const parseResult = await hook.parse(state, message);
   if (parseResult !== undefined) {
@@ -166,14 +166,14 @@ async function runHook(hook: HookType, state: StateType, message?: MessageType) 
 }
 
 
-async function processMessage<TMessage: MessageType, THandlerResult>(
+async function processMessage<TMessage: IncomingMessageType>(
   session: ExternalSessionType,
   message: TMessage,
   yakSession: YakSessionType,
   globalTopic,
   globalContext
-) : Promise<?THandlerResult> {
-  let handlerResult: ?THandlerResult;
+) : Promise<Array<OutgoingMessageType>> {
+  let handlerResult: ?HandlerResultType;
 
   const context = activeContext(yakSession);
   /*
@@ -213,7 +213,7 @@ async function processMessage<TMessage: MessageType, THandlerResult>(
     }
   }
 
-  return handlerResult;
+  return handlerResult ? [].concat(handlerResult) : [];
 }
 
 
@@ -221,7 +221,7 @@ type InitOptionsType = {
   getSessionId: (session: ExternalSessionType) => string,
   getSessionType: (session: ExternalSessionType) => string,
   messageOptions: (
-    { strategy: "custom", messageParser: (messages: Array<Object>) => MessageType } |
+    { strategy: "custom", messageParser: (messages: Array<Object>) => IncomingMessageType } |
     { strategy: "single" } |
     { strategy: "merge" } |
     { strategy: "first" } |
@@ -229,7 +229,7 @@ type InitOptionsType = {
   )
 }
 
-type TopicsHandler = (session: ExternalSessionType, messages: Array<MessageType> | MessageType) => Object
+type TopicsHandler = (session: ExternalSessionType, messages: Array<IncomingMessageType> | IncomingMessageType) => Object
 
 export function init(allTopics: Array<TopicType>, options: InitOptionsType) : TopicsHandler {
   const globalTopic = findTopic("global", allTopics);
@@ -241,7 +241,7 @@ export function init(allTopics: Array<TopicType>, options: InitOptionsType) : To
     strategy: "last"
   };
 
-  return async function(session: ExternalSessionType, _messages: Array<MessageType> | MessageType) : Promise<Array<Object>> {
+  return async function(session: ExternalSessionType, _messages: Array<IncomingMessageType> | IncomingMessageType) : Promise<Array<OutgoingMessageType>> {
     const messages = _messages instanceof Array ? _messages : [_messages];
 
     const savedSession = await libSession.get(getSessionId(session), topics);
@@ -263,14 +263,14 @@ export function init(allTopics: Array<TopicType>, options: InitOptionsType) : To
       }
     }
 
-    const results = [];
+    let results: Array<OutgoingMessageType> = [];
 
     switch (messageOptions.strategy) {
       case "last": {
         const message = formatters[session.type].parseIncomingMessage(messages.slice(-1)[0]);
         const result = await processMessage(session, message, yakSession, globalTopic, globalContext);
         if (result) {
-          results.push(result);
+          results = result;
         }
         break;
       }
@@ -278,7 +278,7 @@ export function init(allTopics: Array<TopicType>, options: InitOptionsType) : To
         const message = formatters[session.type].parseIncomingMessage(messages[0]);
         const result = await processMessage(session, message, yakSession, globalTopic, globalContext);
         if (result) {
-          results.push(result);
+          results = result;
         }
         break;
       }
@@ -287,7 +287,7 @@ export function init(allTopics: Array<TopicType>, options: InitOptionsType) : To
           const message = formatters[session.type].parseIncomingMessage(_message);
           const result = await processMessage(session, message, yakSession, globalTopic, globalContext);
           if (result) {
-            results.push(result);
+            results = result;
           }
         }
         break;
@@ -296,7 +296,7 @@ export function init(allTopics: Array<TopicType>, options: InitOptionsType) : To
         const message = formatters[session.type].mergeIncomingMessages(messages);
         const result = await processMessage(session, message, yakSession, globalTopic, globalContext);
         if (result) {
-          results.push(result);
+          results = result;
         }
         break;
       }
@@ -305,7 +305,7 @@ export function init(allTopics: Array<TopicType>, options: InitOptionsType) : To
         const customMessage = await messageOptions.messageParser(parsedMessages);
         const result = await processMessage(session, customMessage, yakSession, globalTopic, globalContext);
         if (result) {
-          results.push(result);
+          results = result;
         }
         break;
       }
