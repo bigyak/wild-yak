@@ -1,19 +1,10 @@
 /* @flow */
-import * as fbFormatter from "./formatters/fb";
-import * as webFormatter from "./formatters/web";
 import * as libSession from "./lib/session";
 
-
 import type {
-  TopicType, ParseFuncType, HandlerFuncType, HandlerResultType, IncomingStringMessageType, ExternalIncomingMessageType, IncomingMessageType, OutgoingMessageType, StateType, ContextType,
+  TopicType, ParseFuncType, HandlerFuncType, HandlerResultType, IncomingStringMessageType, IncomingMessageType, OutgoingMessageType, StateType, ContextType,
   RegexParseResultType, HookType, ExternalSessionType, YakSessionType
 } from "./types";
-
-
-const formatters = {
-  facebook: fbFormatter,
-  web: webFormatter
-}
 
 
 export function defTopic<TInitArgs, TContextData>(
@@ -212,24 +203,16 @@ async function processMessage<TMessage: IncomingMessageType>(
       }
     }
   }
-
   return handlerResult ? [].concat(handlerResult) : [];
 }
 
 
 type InitOptionsType = {
   getSessionId: (session: ExternalSessionType) => string,
-  getSessionType: (session: ExternalSessionType) => string,
-  messageOptions: (
-    { strategy: "custom", messageParser: (messages: Array<Object>) => IncomingMessageType } |
-    { strategy: "single" } |
-    { strategy: "merge" } |
-    { strategy: "first" } |
-    { strategy: "last" }
-  )
+  getSessionType: (session: ExternalSessionType) => string
 }
 
-type TopicsHandler = (session: ExternalSessionType, messages: Array<ExternalIncomingMessageType> | ExternalIncomingMessageType) => Object
+type TopicsHandler = (session: ExternalSessionType, message: IncomingMessageType) => Object
 
 export function init(allTopics: Array<TopicType>, options: InitOptionsType) : TopicsHandler {
   const globalTopic = findTopic("global", allTopics);
@@ -237,16 +220,11 @@ export function init(allTopics: Array<TopicType>, options: InitOptionsType) : To
 
   const getSessionId = options.getSessionId || (session => session.id);
   const getSessionType = options.getSessionType || (session => session.type);
-  const messageOptions = options.messageOptions || {
-    strategy: "last"
-  };
 
   return async function(
     session: ExternalSessionType,
-    _messages: Array<ExternalIncomingMessageType> | ExternalIncomingMessageType
+    message: IncomingMessageType
   ) : Promise<Array<OutgoingMessageType>> {
-    const messages = _messages instanceof Array ? _messages : [_messages];
-
     const savedSession = await libSession.get(getSessionId(session), topics);
     const yakSession = savedSession ? { ...savedSession, topics } :
       { id: getSessionId(session), type: getSessionType(session), contexts: [], virgin: true, topics };
@@ -266,55 +244,7 @@ export function init(allTopics: Array<TopicType>, options: InitOptionsType) : To
       }
     }
 
-    let results: Array<OutgoingMessageType> = [];
-
-    switch (messageOptions.strategy) {
-      case "last": {
-        const message = formatters[session.type].parseIncomingMessage(messages.slice(-1)[0]);
-        const result = await processMessage(session, message, yakSession, globalTopic, globalContext);
-        if (result) {
-          results = result;
-        }
-        break;
-      }
-      case "first": {
-        const message = formatters[session.type].parseIncomingMessage(messages[0]);
-        const result = await processMessage(session, message, yakSession, globalTopic, globalContext);
-        if (result) {
-          results = result;
-        }
-        break;
-      }
-      case "single": {
-        for (const _message of messages) {
-          const message = formatters[session.type].parseIncomingMessage(_message);
-          const result = await processMessage(session, message, yakSession, globalTopic, globalContext);
-          if (result) {
-            results = result;
-          }
-        }
-        break;
-      }
-      case "merge": {
-        const message = formatters[session.type].mergeIncomingMessages(messages);
-        const result = await processMessage(session, message, yakSession, globalTopic, globalContext);
-        if (result) {
-          results = result;
-        }
-        break;
-      }
-      case "custom": {
-        const parsedMessages = messages.map(m => formatters[session.type].parseIncomingMessage(m));
-        const customMessage = await messageOptions.messageParser(parsedMessages);
-        const result = await processMessage(session, customMessage, yakSession, globalTopic, globalContext);
-        if (result) {
-          results = result;
-        }
-        break;
-      }
-      default:
-        throw new Error("Unknown message type.")
-    }
+    const results: Array<OutgoingMessageType> = await processMessage(session, message, yakSession, globalTopic, globalContext);
     await libSession.save(yakSession);
     return results;
   }
