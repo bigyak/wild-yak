@@ -2,9 +2,9 @@
 import * as libSession from "./lib/session";
 
 import type {
-  TopicType, ParseFuncType, HandlerFuncType, HandlerResultType, IncomingStringMessageType, IncomingMessageType, OutgoingMessageType, StateType, ContextType,
-  RegexParseResultType, HookType, ExternalSessionType, YakSessionType
-} from "./types";
+  InitYakOptionsType, TopicType, ParseFuncType, HandlerFuncType, IncomingStringMessageType, IncomingMessageType, OutgoingMessageType, StateType, ContextType,
+  RegexParseResultType, HookType, ExternalSessionType, YakSessionType, TopicsHandler
+} from "../types";
 
 
 export function defTopic<TInitArgs, TContextData>(
@@ -145,7 +145,7 @@ export function disableHooks(state: StateType, list: Array<string>) : void {
 }
 
 
-async function runHook(hook: HookType, state: StateType, message?: IncomingMessageType) : Promise<[boolean, ?HandlerResultType]> {
+async function runHook(hook: HookType, state: StateType, message?: IncomingMessageType) : Promise<[boolean, ?Array<OutgoingMessageType>]> {
   const { context, session } = state;
   const parseResult = await hook.parse(state, message);
   if (parseResult !== undefined) {
@@ -164,7 +164,7 @@ async function processMessage<TMessage: IncomingMessageType>(
   globalTopic,
   globalContext
 ) : Promise<Array<OutgoingMessageType>> {
-  let handlerResult: ?HandlerResultType;
+  let handlerResult: ?Array<OutgoingMessageType>;
 
   const context = activeContext(yakSession);
   /*
@@ -207,14 +207,7 @@ async function processMessage<TMessage: IncomingMessageType>(
 }
 
 
-type InitOptionsType = {
-  getSessionId: (session: ExternalSessionType) => string,
-  getSessionType: (session: ExternalSessionType) => string
-}
-
-type TopicsHandler = (session: ExternalSessionType, message: IncomingMessageType) => Object
-
-export function init(allTopics: Array<TopicType>, options: InitOptionsType) : TopicsHandler {
+export function init(allTopics: Array<TopicType>, options: InitYakOptionsType) : TopicsHandler {
   const globalTopic = findTopic("global", allTopics);
   const topics = allTopics.filter(t => t.name !== "global");
 

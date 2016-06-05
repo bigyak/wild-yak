@@ -6,6 +6,14 @@
 export type ExternalSessionType = Object;
 
 /*
+  Options passed in by the calling external program
+*/
+export type InitYakOptionsType = {
+  getSessionId: (session: ExternalSessionType) => string,
+  getSessionType: (session: ExternalSessionType) => string
+}
+
+/*
   Message types that will be passed to the Yak
 */
 type IncomingMessageBaseType = { timestamp: number }
@@ -91,7 +99,7 @@ export type StateType<TContextData> = {
 }
 
 /*
-  The resumt of a RegExp parser.
+  The resume of a RegExp parser.
   Contains original message, index of matched pattern, and a list of matches.
 */
 export type RegexParseResultType = {
@@ -101,6 +109,6 @@ export type RegexParseResultType = {
 }
 
 /*
-  A handler can return a single response or an array of responses.
+  Handler returned to the external app. This is the entry point into Wild Yak
 */
-export type HandlerResultType = OutgoingMessageType | Array<OutgoingMessageType>;
+export type TopicsHandler = (session: ExternalSessionType, message: IncomingMessageType) => Promise<Array<OutgoingMessageType>>
