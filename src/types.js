@@ -16,10 +16,18 @@ export type InitYakOptionsType = {
 /*
   Message types that will be passed to the Yak
 */
-type IncomingMessageBaseType = { timestamp: number }
-export type IncomingStringMessageType = IncomingMessageBaseType & { type: "string", text: string };
+type IncomingMessageBaseType = {  }
+export type IncomingStringMessageType = {
+  timestamp: number,
+  type: "string",
+  text: string
+}
 type IncomingMediaType = { url: string }
-export type IncomingMediaMessageType = IncomingMessageBaseType & { type: "media", attachments: Array<IncomingMediaType> }
+export type IncomingMediaMessageType = {
+  timestamp: number,
+  type: "media",
+  attachments: Array<IncomingMediaType>
+}
 export type IncomingMessageType = IncomingStringMessageType | IncomingMediaMessageType;
 
 /*
