@@ -1,7 +1,7 @@
 /* @flow */
 
 //FIXME: This is completely broken!
-import type { TopicType, YakSessionType } from "../../types";
+import type { TopicType, YakSessionType } from "../types";
 
 const yakSessions = {};
 

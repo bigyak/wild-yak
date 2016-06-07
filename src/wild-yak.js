@@ -4,7 +4,7 @@ import * as libSession from "./lib/session";
 import type {
   InitYakOptionsType, TopicType, ParseFuncType, HandlerFuncType, IncomingStringMessageType, IncomingMessageType, OutgoingMessageType, StateType, ContextType,
   RegexParseResultType, HookType, ExternalSessionType, YakSessionType, TopicsHandler
-} from "../types";
+} from "./types";
 
 
 export function defTopic<TInitArgs, TContextData>(
