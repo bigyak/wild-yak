@@ -46,7 +46,7 @@ describe("Wild yak", () => {
     const result = await handler(session, message);
 
     env._enteredMain.should.be.true("Entered main");
-    result[0].should.equal("hey, what's up!");
+    result[0].text.should.equal("hey, what's up!");
   });
 
 
@@ -60,7 +60,7 @@ describe("Wild yak", () => {
     const result = await handler(session, message);
 
     env._enteredMain.should.be.true("Entered main");
-    result[0].should.equal("omg zomg!");
+    result[0].text.should.equal("omg zomg!");
   });
 
 

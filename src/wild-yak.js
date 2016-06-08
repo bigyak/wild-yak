@@ -239,6 +239,7 @@ export function init(allTopics: Array<TopicType>, options: InitYakOptionsType) :
 
     const results: Array<OutgoingMessageType> = await processMessage(session, message, yakSession, globalTopic, globalContext);
     await libSession.save(yakSession);
-    return results;
+
+    return results.map(r => typeof r === "string" ? { type: "string", text: r } : r);
   }
 }
