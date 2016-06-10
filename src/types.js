@@ -50,7 +50,7 @@ export type TopicType<TInitArgs, TContextData> = {
   isRoot: boolean,
   callbacks?: ?Array<(state: any, params: any) => Promise>,
   hooks: Array<HookType<TContextData, Object, Object, IncomingMessageType>>,
-  afterInit?: ?(state: StateType<TContextData>, session: ExternalSessionType) => Promise
+  afterInit?: ?(state: StateType<TContextData>) => Promise
 }
 
 /*
