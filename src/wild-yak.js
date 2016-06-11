@@ -218,8 +218,7 @@ export function init(allTopics: Array<TopicType>, options: InitYakOptionsType) :
     session: ExternalSessionType,
     message: IncomingMessageType
   ) : Promise<Array<OutgoingMessageType>> {
-    const savedSession = await libSession.get(getSessionId(session), topics);
-    const yakSession = savedSession ? { ...savedSession, topics } :
+    const yakSession = (await libSession.get(getSessionId(session), topics)) ||
       { id: getSessionId(session), type: getSessionType(session), contexts: [], virgin: true, topics };
 
     const globalContext = { yakSession, activeHooks:[], disabledHooks: [], topic: globalTopic };
