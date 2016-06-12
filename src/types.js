@@ -60,7 +60,9 @@ export type TopicType<TInitArgs, TContextData> = {
 export type YakSessionType = {
   topics: Array<TopicType<Object, ContextType>>,
   contexts: Array<ContextType>,
-  virgin: boolean
+  virgin: boolean,
+  id: string,
+  clear: boolean
 }
 
 /*

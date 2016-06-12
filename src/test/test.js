@@ -211,4 +211,26 @@ describe("Wild yak", () => {
     _threwError.should.be.true();
   });
 
+
+  it("Returns a message from a hook", async () => {
+    const session = getSession();
+    const { env, topics } = getTopics({ includeMain: true });
+
+    const message = { text: "Boomshanker" };
+
+    const handler = await init(topics, {getSessionId, getSessionType});
+
+    env.clearYakSession_test = true;
+
+    const result = await handler(session, message);
+    env._enteredMain.should.be.true("First message: Entered main");
+    env._enteredMain = false;
+    result[0].text.should.equal("omg zomg!");
+
+    //#REPEAT IT
+    const message2 = { text: "somethingweird" };
+    const result2 = await handler(session, message2);
+    env._enteredMain.should.be.true("Second message: Entered main");
+  });
+
 })

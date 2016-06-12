@@ -24,6 +24,7 @@ export async function get(id: string, topics: Array<TopicType>) : Promise<?YakSe
       };
       return Object.assign({}, c, ctxParams);
     });
+    yakSession.clear = false;
     yakSession.topics = topics;
     return yakSession;
   }

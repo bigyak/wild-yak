@@ -206,8 +206,9 @@ async function processMessage<TMessage: IncomingMessageType>(
   return handlerResult ? [].concat(handlerResult) : [];
 }
 
-export async function clearYakSession(id: string) : Promise {
-  await libSession.clear(id);
+export async function clearYakSession(state: StateType) : Promise {
+  await libSession.clear(state.context.yakSession.id);
+  state.context.yakSession.clear = true;
 }
 
 export function init(allTopics: Array<TopicType>, options: InitYakOptionsType) : TopicsHandler {
@@ -222,7 +223,7 @@ export function init(allTopics: Array<TopicType>, options: InitYakOptionsType) :
     message: IncomingMessageType
   ) : Promise<Array<OutgoingMessageType>> {
     const yakSession = (await libSession.get(getSessionId(session), topics)) ||
-      { id: getSessionId(session), type: getSessionType(session), contexts: [], virgin: true, topics };
+      { id: getSessionId(session), type: getSessionType(session), contexts: [], virgin: true, topics, clear: false };
 
     const globalContext = { yakSession, activeHooks:[], disabledHooks: [], topic: globalTopic };
 
@@ -240,7 +241,12 @@ export function init(allTopics: Array<TopicType>, options: InitYakOptionsType) :
     }
 
     const results: Array<OutgoingMessageType> = await processMessage(session, message, yakSession, globalTopic, globalContext);
-    await libSession.save(yakSession);
+
+    if (!yakSession.clear) {
+      await libSession.save(yakSession);
+    } else {
+      yakSession.clear = true;
+    }
 
     return results.map(r => typeof r === "string" ? { type: "string", text: r } : r);
   }
