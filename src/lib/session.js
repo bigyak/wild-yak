@@ -5,9 +5,14 @@ import type { TopicType, YakSessionType } from "../types";
 
 const yakSessions = {};
 
+export async function clear(id: string) {
+  delete yakSessions[id];
+}
+
 export async function get(id: string, topics: Array<TopicType>) : Promise<?YakSessionType> {
   if (yakSessions[id]) {
     const yakSession = JSON.parse(yakSessions[id]);
+    yakSession.id = id;
     yakSession.contexts = yakSession.contexts.map(c => {
       const topic = topics.find(t => t.name === c.topic);
       const parentTopic = topics.find(t => t.name === c.parentTopic);

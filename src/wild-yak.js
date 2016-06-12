@@ -206,6 +206,9 @@ async function processMessage<TMessage: IncomingMessageType>(
   return handlerResult ? [].concat(handlerResult) : [];
 }
 
+export async function clearYakSession(id: string) : Promise {
+  await libSession.clear(id);
+}
 
 export function init(allTopics: Array<TopicType>, options: InitYakOptionsType) : TopicsHandler {
   const globalTopic = findTopic("global", allTopics);
