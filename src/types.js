@@ -48,7 +48,7 @@ export type TopicType<TInitArgs, TContextData> = {
   name: string,
   init: (args: TInitArgs, session: ExternalSessionType) => Promise<TContextData>,
   isRoot: boolean,
-  callbacks?: ?Array<(state: any, params: any) => Promise>,
+  callbacks?: { [key: string]: (state: any, params: any) => Promise },
   hooks: Array<HookType<TContextData, Object, Object, IncomingMessageType>>,
   afterInit?: ?(state: StateType<TContextData>) => Promise
 }
@@ -74,6 +74,7 @@ export type ContextType<TContextData> = {
   disabledHooks: Array<string>,
   yakSession: YakSessionType,
   topic: TopicType,
+  parentTopic?: TopicType,
   cb?: Function
 }
 

@@ -13,7 +13,7 @@ export function defTopic<TInitArgs, TContextData>(
   options: {
     isRoot?: boolean,
     hooks?: Array<HookType<TContextData, IncomingMessageType, Object, Object>>,
-    callbacks?: Array<(state: StateType<TContextData>, params: any) => Promise>,
+    callbacks?: { [key: string]: (state: StateType<TContextData>, params: any) => Promise },
     afterInit?: ?(state: StateType<TContextData>) => Promise
   }
 ) : TopicType<TInitArgs, TContextData> {
@@ -245,7 +245,7 @@ export function init(allTopics: Array<TopicType>, options: InitYakOptionsType) :
     if (!yakSession.clear) {
       await libSession.save(yakSession);
     } else {
-      yakSession.clear = true;
+      yakSession.clear = false;
     }
 
     return results.map(r => typeof r === "string" ? { type: "string", text: r } : r);

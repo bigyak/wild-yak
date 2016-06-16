@@ -3,7 +3,7 @@
 //FIXME: This is completely broken!
 import type { TopicType, YakSessionType } from "../types";
 
-const yakSessions = {};
+const yakSessions: { [key: string]: string } = {};
 
 export async function clear(id: string) {
   delete yakSessions[id];
@@ -11,16 +11,17 @@ export async function clear(id: string) {
 
 export async function get(id: string, topics: Array<TopicType>) : Promise<?YakSessionType> {
   if (yakSessions[id]) {
-    const yakSession = JSON.parse(yakSessions[id]);
+    const yakSession: YakSessionType = JSON.parse(yakSessions[id]);
     yakSession.id = id;
     yakSession.contexts = yakSession.contexts.map(c => {
       const topic = topics.find(t => t.name === c.topic);
       const parentTopic = topics.find(t => t.name === c.parentTopic);
+      const callbackName: string = (c.cb: any); //When we rehydrate, we get a string not an Fn.
       const ctxParams = {
         yakSession,
         topic,
         parentTopic,
-        cb: c.cb && parentTopic.callbacks ? parentTopic.callbacks[c.cb] : undefined
+        cb: callbackName && parentTopic.callbacks ? parentTopic.callbacks[callbackName] : undefined
       };
       return Object.assign({}, c, ctxParams);
     });
