@@ -37,7 +37,7 @@ export function defPattern<TInitArgs, TContextData, THandlerResult>(
     name,
     parse: async (state: StateType<TContextData>, message: ?IncomingStringMessageType) : Promise<?RegexParseResultType> => {
       if (message) {
-        const text = message.text;
+        const text: string = message.text;
         for (let i = 0; i < patterns.length; i++) {
           const matches = patterns[i].exec(text);
           if (matches) {
@@ -77,13 +77,13 @@ function findTopic(name: string, topics: Array<TopicType>) : TopicType {
 
 export async function enterTopic<TInitArgs, TContextData, TNewInitArgs, TNewContextData, TCallbackArgs, TCallbackResult>(
   topic: TopicType<TInitArgs, TContextData>,
-  state: StateType,
+  state: StateType<TContextData>,
   newTopic: TopicType<TNewInitArgs, TNewContextData>,
   args: TNewInitArgs,
   cb?: HandlerFuncType<TContextData, TCallbackArgs, TCallbackResult>
 ) : Promise {
   const currentContext = state.context;
-  const session = state.session;
+  const session: ExternalSessionType = state.session;
   const yakSession = currentContext.yakSession;
 
   const contextOnStack = activeContext(yakSession);
@@ -92,7 +92,7 @@ export async function enterTopic<TInitArgs, TContextData, TNewInitArgs, TNewCont
     throw new Error("You can only enter a new context from the last context.");
   }
 
-  const newContext = {
+  const newContext: ContextType<TNewContextData> = {
     data: await newTopic.init(args, session),
     topic: newTopic,
     parentTopic: topic,
@@ -212,17 +212,17 @@ export async function clearYakSession(state: StateType) : Promise {
 }
 
 export function init(allTopics: Array<TopicType>, options: InitYakOptionsType) : TopicsHandler {
-  const globalTopic = findTopic("global", allTopics);
+  const globalTopic: TopicType = findTopic("global", allTopics);
   const topics = allTopics.filter(t => t.name !== "global");
 
-  const getSessionId = options.getSessionId || (session => session.id);
-  const getSessionType = options.getSessionType || (session => session.type);
+  const getSessionId = options.getSessionId;
+  const getSessionType = options.getSessionType;
 
   return async function(
     session: ExternalSessionType,
     message: IncomingMessageType
   ) : Promise<Array<OutgoingMessageType>> {
-    const yakSession = (await libSession.get(getSessionId(session), topics)) ||
+    const yakSession: YakSessionType = (await libSession.get(getSessionId(session), topics)) ||
       { id: getSessionId(session), type: getSessionType(session), contexts: [], virgin: true, topics, clear: false };
 
     const globalContext = { yakSession, activeHooks:[], disabledHooks: [], topic: globalTopic };
