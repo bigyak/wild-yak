@@ -1,7 +1,6 @@
 {
-  "name": "yak-ai-wild-yak",
-  "private": true,
-  "version": "0.1.0",
+  "name": "wild-yak",
+  "version": "0.0.1",
   "author": "Jeswin Kumar<jeswinpk@agilehead.com>",
   "main": "dist/wild-yak",
   "scripts": {
