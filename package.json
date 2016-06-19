@@ -1,12 +1,13 @@
 {
   "name": "wild-yak",
-  "version": "0.0.1",
-  "author": "Jeswin Kumar<jeswinpk@agilehead.com>",
+  "version": "0.0.2",
+  "author": "Yak<yak@agilehead.com>",
   "main": "dist/wild-yak",
   "scripts": {
     "test": "./build.sh && mocha --require source-map-support/register dist/test/test.js",
     "test-debug": "./build.sh && mocha --debug-brk --require source-map-support/register dist/test/test.js"
   },
+  "license": "MIT",
   "dependencies": {
     "babel-polyfill": "*"
   },
