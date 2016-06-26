@@ -35,38 +35,53 @@ export type IncomingMessageType = IncomingStringMessageType | IncomingMediaMessa
 */
 export type OutgoingStringMessageType = { type: "string", text: string };
 export type OptionMessageType = { type: "option", values: Array<string> };
-export type OutgoingMessageType = OutgoingStringMessageType | OptionMessageType;
+export type OutgoingMessageType = string | OutgoingStringMessageType | OptionMessageType;
+
+export type HookResultType = OutgoingMessageType | Array<OutgoingMessageType>;
 
 /*
   Definition of a Topic.
 */
 export type TopicParams<TContextData> = {
   isRoot: boolean,
-  hooks: Array<HookType<TContextData, Object, Object, IncomingMessageType>>
+  hooks: Array<HookType<TContextData, Object, Object, OutgoingMessageType>>
 }
+
 export type TopicType<TInitArgs, TContextData> = {
   name: string,
   init: (args: TInitArgs, session: ExternalSessionType) => Promise<TContextData>,
   isRoot: boolean,
-  callbacks?: { [key: string]: (state: any, params: any) => Promise },
-  hooks: Array<HookType<TContextData, Object, Object, IncomingMessageType>>,
-  afterInit?: ?(state: StateType<TContextData>) => Promise
+  callbacks?: { [key: string]: (state: any, params: any) => Promise<any> },
+  hooks: Array<HookType<TContextData, Object, ?Object, HookResultType>>,
+  afterInit?: ?(state: StateType<TContextData>) => Promise<any>
 }
 
 /*
   The topics dictionary
 */
 export type TopicsDict = {
-  [key: string]: Array<TopicType>
+  [key: string]: Array<TopicType<any, any>>
 }
+
+/*
+  Context. This is where each topic stores its state.
+*/
+export type ContextType<TContextData> = {
+  data?: TContextData,
+  activeHooks: Array<string>,
+  disabledHooks: Array<string>,
+  topic: TopicType<any, TContextData>,
+  parentTopic?: TopicType<any, any>,
+  cb?: Function
+}
+
 
 /*
   Conversations contain all the contexts.
 */
 export type ConversationType = {
-  conversationId: string,
-  yakSession: YakSessionType,
-  contexts: Array<ContextType>,
+  id: string,
+  contexts: Array<ContextType<any>>,
   virgin: boolean,
   clear?: boolean
 }
@@ -76,23 +91,8 @@ export type ConversationType = {
   Like conversations, virginity etc.
 */
 export type YakSessionType = {
-  topics: Array<TopicType<Object, ContextType>>,
   conversations: Array<ConversationType>,
-  id: string,
-  clear?: boolean
-}
-
-/*
-  The topic. This is where each topic stores its state.
-*/
-export type ContextType<TContextData> = {
-  data?: TContextData,
-  activeHooks: Array<string>,
-  disabledHooks: Array<string>,
-  conversation: ConversationType,
-  topic: TopicType,
-  parentTopic?: TopicType,
-  cb?: Function
+  id: string
 }
 
 /*
@@ -104,12 +104,13 @@ export type ParseFuncType<TContextData, TMessage: IncomingMessageType, TParseRes
 /*
   Recieves a ParseResult from the Parse() function. Handler can optionally return a result.
 */
-export type HandlerFuncType<TContextData, THandlerArgs, THandlerResult> = (state: StateType<TContextData>, args: THandlerArgs) => Promise<?THandlerResult>;
+export type HandlerFuncType<TContextData, THandlerArgs, THandlerResult: HookResultType> =
+  (state: StateType<TContextData>, args: THandlerArgs) => Promise<?THandlerResult>;
 
 /*
   The Hook. Contains a name, a parse(): ParseFuncType function, a handler(): HandlerFuncType
 */
-export type HookType<TContextData, TMessage: IncomingMessageType, TParseResult, THandlerResult> = {
+export type HookType<TContextData, TMessage: IncomingMessageType, TParseResult, THandlerResult: HookResultType> = {
   name: string,
   parse: ParseFuncType<TContextData, TMessage, TParseResult>,
   handler: HandlerFuncType<TContextData, TParseResult, THandlerResult>
@@ -123,6 +124,8 @@ export type HookType<TContextData, TMessage: IncomingMessageType, TParseResult, 
 */
 export type StateType<TContextData> = {
   context: ContextType<TContextData>,
+  conversation: ConversationType,
+  yakSession: YakSessionType,
   session: ExternalSessionType
 }
 
@@ -139,4 +142,4 @@ export type RegexParseResultType = {
 /*
   Handler returned to the external app. This is the entry point into Wild Yak
 */
-export type TopicsHandler = (conversationId: string, topicSelector: string, session: ExternalSessionType, message: IncomingMessageType) => Promise<Array<OutgoingMessageType>>
+export type TopicsHandler = (conversationId: string, topicSelector: string, session: ExternalSessionType, message: IncomingMessageType) => Promise<HookResultType>

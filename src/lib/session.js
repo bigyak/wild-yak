@@ -9,7 +9,7 @@ export async function clear(id: string) {
   delete yakSessions[id];
 }
 
-export async function get(id: string, topics: Array<TopicType>) : Promise<?YakSessionType> {
+export async function get(id: string, topics: Array<TopicType<any, any>>) : Promise<?YakSessionType> {
   if (yakSessions[id]) {
     const yakSession: YakSessionType = JSON.parse(yakSessions[id]);
     yakSession.id = id;
@@ -19,7 +19,6 @@ export async function get(id: string, topics: Array<TopicType>) : Promise<?YakSe
         const parentTopic = topics.find(t => t.name === c.parentTopic);
         const callbackName: string = (c.cb: any); //When we rehydrate, we get a string not an Fn.
         const ctxParams = {
-          conversation,
           topic,
           parentTopic,
           cb: callbackName && parentTopic.callbacks ? parentTopic.callbacks[callbackName] : undefined
@@ -36,7 +35,7 @@ export async function get(id: string, topics: Array<TopicType>) : Promise<?YakSe
   }
 }
 
-export async function save(yakSession: YakSessionType) : Promise {
+export async function save(yakSession: YakSessionType) : Promise<void> {
   const conversations = yakSession.conversations.map(conversation => {
     const contexts = conversation.contexts.map(c => {
       const ctxParams = {

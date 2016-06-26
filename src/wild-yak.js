@@ -2,8 +2,9 @@
 import * as libSession from "./lib/session";
 
 import type {
-  InitYakOptionsType, TopicType, TopicsDict, ConversationType, ParseFuncType, HandlerFuncType, IncomingStringMessageType, IncomingMessageType, OutgoingMessageType, StateType, ContextType,
-  RegexParseResultType, HookType, ExternalSessionType, YakSessionType, TopicsHandler
+  InitYakOptionsType, TopicType, TopicsDict, ConversationType, ParseFuncType, HandlerFuncType, IncomingStringMessageType,
+  IncomingMessageType, OutgoingMessageType, StateType, ContextType, RegexParseResultType, HookResultType,
+  HookType, ExternalSessionType, YakSessionType, TopicsHandler
 } from "./types";
 
 
@@ -12,9 +13,9 @@ export function defTopic<TInitArgs, TContextData>(
   init: (args: TInitArgs, session: ExternalSessionType) => Promise<TContextData>,
   options: {
     isRoot?: boolean,
-    hooks?: Array<HookType<TContextData, IncomingMessageType, Object, Object>>,
-    callbacks?: { [key: string]: (state: StateType<TContextData>, params: any) => Promise },
-    afterInit?: ?(state: StateType<TContextData>) => Promise
+    hooks?: Array<HookType<TContextData, IncomingMessageType, ?Object, HookResultType>>,
+    callbacks?: { [key: string]: (state: StateType<TContextData>, params: any) => Promise<any> },
+    afterInit?: ?(state: StateType<TContextData>) => Promise<any>
   }
 ) : TopicType<TInitArgs, TContextData> {
   return {
@@ -27,7 +28,7 @@ export function defTopic<TInitArgs, TContextData>(
   };
 }
 
-export function defPattern<TInitArgs, TContextData, THandlerResult>(
+export function defPattern<TInitArgs, TContextData, THandlerResult: HookResultType>(
   topic: TopicType<TInitArgs, TContextData>,
   name: string,
   patterns: Array<RegExp>,
@@ -51,7 +52,7 @@ export function defPattern<TInitArgs, TContextData, THandlerResult>(
 }
 
 
-export function defHook<TInitArgs, TContextData, TMessage: IncomingMessageType, TParseResult, THandlerResult>(
+export function defHook<TInitArgs, TContextData, TMessage: IncomingMessageType, TParseResult, THandlerResult: HookResultType>(
   topic: TopicType<TInitArgs, TContextData>,
   name: string,
   parse: ParseFuncType<TContextData, TMessage, TParseResult>,
@@ -65,23 +66,23 @@ export function defHook<TInitArgs, TContextData, TMessage: IncomingMessageType, 
 }
 
 
-export function activeContext(conversation: ConversationType) : ContextType {
+export function activeContext(conversation: ConversationType) : ContextType<any> {
   return conversation.contexts.slice(-1)[0];
 }
 
 
-function findTopic(name: string, topics: Array<TopicType>) : TopicType {
+function findTopic(name: string, topics: Array<TopicType<any, any>>) : TopicType<any, any> {
   return topics.filter(t => t.name === name)[0]
 }
 
 
-export async function enterTopic<TInitArgs, TContextData, TNewInitArgs, TNewContextData, TCallbackArgs, TCallbackResult>(
+export async function enterTopic<TInitArgs, TContextData, TNewInitArgs, TNewContextData, TCallbackArgs, TCallbackResult: HookResultType>(
   topic: TopicType<TInitArgs, TContextData>,
   state: StateType<TContextData>,
   newTopic: TopicType<TNewInitArgs, TNewContextData>,
   args: TNewInitArgs,
   cb?: HandlerFuncType<TContextData, TCallbackArgs, TCallbackResult>
-) : Promise {
+) : Promise<void> {
   const { context: currentContext, conversation, yakSession, session } = state;
 
   if (!conversation) {
@@ -116,7 +117,7 @@ export async function enterTopic<TInitArgs, TContextData, TNewInitArgs, TNewCont
 
 export async function exitTopic<TInitArgs, TContextData>(
   topic: TopicType<TInitArgs, TContextData>,
-  state: StateType,
+  state: StateType<TContextData>,
   args: Object
 ) : Promise<?Object> {
   const { context, conversation, yakSession, session } = state;
@@ -135,17 +136,21 @@ export async function exitTopic<TInitArgs, TContextData>(
 }
 
 
-export function disableHooksExcept(state: StateType, list: Array<string>) : void {
+export function disableHooksExcept<TContextData>(state: StateType<TContextData>, list: Array<string>) : void {
   state.context.activeHooks = list;
 }
 
 
-export function disableHooks(state: StateType, list: Array<string>) : void {
+export function disableHooks<TContextData>(state: StateType<TContextData>, list: Array<string>) : void {
   state.context.disabledHooks = list;
 }
 
 
-async function runHook(hook: HookType, state: StateType, message?: IncomingMessageType) : Promise<[boolean, ?Array<OutgoingMessageType>]> {
+async function runHook<TContextData>(
+  hook: HookType<TContextData, IncomingMessageType, ?Object, HookResultType>,
+  state: StateType<TContextData>,
+  message?: IncomingMessageType
+) : Promise<[boolean, ?HookResultType]> {
   const { context, session } = state;
   const parseResult = await hook.parse(state, message);
   if (parseResult !== undefined) {
@@ -163,10 +168,10 @@ async function processMessage<TMessage: IncomingMessageType>(
   conversation: ConversationType,
   yakSession: YakSessionType,
   globalContext,
-  globalTopic: TopicType,
-  topics: Array<TopicType>
+  globalTopic: TopicType<any, any>,
+  topics: Array<TopicType<any, any>>
 ) : Promise<Array<OutgoingMessageType>> {
-  let handlerResult: ?Array<OutgoingMessageType>;
+  let handlerResult: ?HookResultType;
 
   const context = activeContext(conversation);
   /*
@@ -208,7 +213,7 @@ async function processMessage<TMessage: IncomingMessageType>(
   return handlerResult ? [].concat(handlerResult) : [];
 }
 
-export async function clearConversation(state: StateType) : Promise {
+export async function clearConversation<TContextData>(state: StateType<TContextData>) : Promise<void> {
   await libSession.clear(state.conversation.id);
   state.conversation.clear = true;
 }
@@ -222,10 +227,10 @@ export function init(topicsDict: TopicsDict, options: InitYakOptionsType) : Topi
     topicSelector: string,
     session: ExternalSessionType,
     message: IncomingMessageType
-  ) : Promise<Array<OutgoingMessageType>> {
+  ) : Promise<HookResultType> {
 
-    const allTopics: Array<TopicType> = topicsDict[topicSelector];
-    const globalTopic: TopicType = findTopic("global", allTopics);
+    const allTopics: Array<TopicType<any, any>> = topicsDict[topicSelector];
+    const globalTopic: TopicType<any, any> = findTopic("global", allTopics);
     const topics = allTopics.filter(t => t.name !== "global");
 
     //Pick the right conversation
@@ -257,12 +262,10 @@ export function init(topicsDict: TopicsDict, options: InitYakOptionsType) : Topi
       }
     }
 
-    const results: Array<OutgoingMessageType> = await processMessage(session, message, conversation, yakSession, globalContext, globalTopic, topics);
+    const results = await processMessage(session, message, conversation, yakSession, globalContext, globalTopic, topics);
 
     if (!conversation.clear) {
       await libSession.save(yakSession);
-    } else {
-      yakSession.clear = false;
     }
 
     return results.map(r => typeof r === "string" ? { type: "string", text: r } : r);
