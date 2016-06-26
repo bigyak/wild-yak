@@ -85,9 +85,6 @@ export async function enterTopic<TInitArgs, TContextData, TNewInitArgs, TNewCont
 ) : Promise<void> {
   const { context: currentContext, conversation, yakSession, session } = state;
 
-  if (!conversation) {
-    console.log(state);
-  }
   const contextOnStack = activeContext(conversation);
 
   if (contextOnStack && state.context !== contextOnStack) {
