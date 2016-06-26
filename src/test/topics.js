@@ -1,4 +1,4 @@
-import { defTopic, defPattern, defHook, enterTopic, exitTopic, disableHooks, disableHooksExcept, clearYakSession } from "../wild-yak";
+import { defTopic, defPattern, defHook, enterTopic, exitTopic, disableHooks, disableHooksExcept, clearConversation } from "../wild-yak";
 import type { TopicType, HookType, RegexParseResultType, StateType } from "../types";
 
 export default function getTopics(options) {
@@ -27,8 +27,8 @@ export default function getTopics(options) {
           env._mainState = state;
           await enterTopic(mainTopic, state, nicknameTopic)
         }
-        if (env.clearYakSession_test) {
-          await clearYakSession(state);
+        if (env.clearConversation_test) {
+          await clearConversation(state);
         }
       },
       hooks: [
@@ -266,6 +266,9 @@ export default function getTopics(options) {
 
   return {
     env,
-    topics
+    topics: {
+      maintopics: topics,
+      other: []
+    }
   };
 }

@@ -54,15 +54,32 @@ export type TopicType<TInitArgs, TContextData> = {
 }
 
 /*
+  The topics dictionary
+*/
+export type TopicsDict = {
+  [key: string]: Array<TopicType>
+}
+
+/*
+  Conversations contain all the contexts.
+*/
+export type ConversationType = {
+  conversationId: string,
+  yakSession: YakSessionType,
+  contexts: Array<ContextType>,
+  virgin: boolean,
+  clear?: boolean
+}
+
+/*
   Yak Session contains Yak specific state.
-  Like contexts, virginity etc.
+  Like conversations, virginity etc.
 */
 export type YakSessionType = {
   topics: Array<TopicType<Object, ContextType>>,
-  contexts: Array<ContextType>,
-  virgin: boolean,
+  conversations: Array<ConversationType>,
   id: string,
-  clear: boolean
+  clear?: boolean
 }
 
 /*
@@ -72,7 +89,7 @@ export type ContextType<TContextData> = {
   data?: TContextData,
   activeHooks: Array<string>,
   disabledHooks: Array<string>,
-  yakSession: YakSessionType,
+  conversation: ConversationType,
   topic: TopicType,
   parentTopic?: TopicType,
   cb?: Function
@@ -122,4 +139,4 @@ export type RegexParseResultType = {
 /*
   Handler returned to the external app. This is the entry point into Wild Yak
 */
-export type TopicsHandler = (session: ExternalSessionType, message: IncomingMessageType) => Promise<Array<OutgoingMessageType>>
+export type TopicsHandler = (conversationId: string, topicSelector: string, session: ExternalSessionType, message: IncomingMessageType) => Promise<Array<OutgoingMessageType>>

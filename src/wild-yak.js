@@ -2,7 +2,7 @@
 import * as libSession from "./lib/session";
 
 import type {
-  InitYakOptionsType, TopicType, ParseFuncType, HandlerFuncType, IncomingStringMessageType, IncomingMessageType, OutgoingMessageType, StateType, ContextType,
+  InitYakOptionsType, TopicType, TopicsDict, ConversationType, ParseFuncType, HandlerFuncType, IncomingStringMessageType, IncomingMessageType, OutgoingMessageType, StateType, ContextType,
   RegexParseResultType, HookType, ExternalSessionType, YakSessionType, TopicsHandler
 } from "./types";
 
@@ -65,8 +65,8 @@ export function defHook<TInitArgs, TContextData, TMessage: IncomingMessageType, 
 }
 
 
-export function activeContext(yakSession: YakSessionType) : ContextType {
-  return yakSession.contexts.slice(-1)[0];
+export function activeContext(conversation: ConversationType) : ContextType {
+  return conversation.contexts.slice(-1)[0];
 }
 
 
@@ -82,11 +82,12 @@ export async function enterTopic<TInitArgs, TContextData, TNewInitArgs, TNewCont
   args: TNewInitArgs,
   cb?: HandlerFuncType<TContextData, TCallbackArgs, TCallbackResult>
 ) : Promise {
-  const currentContext = state.context;
-  const session: ExternalSessionType = state.session;
-  const yakSession = currentContext.yakSession;
+  const { context: currentContext, conversation, yakSession, session } = state;
 
-  const contextOnStack = activeContext(yakSession);
+  if (!conversation) {
+    console.log(state);
+  }
+  const contextOnStack = activeContext(conversation);
 
   if (contextOnStack && state.context !== contextOnStack) {
     throw new Error("You can only enter a new context from the last context.");
@@ -96,20 +97,19 @@ export async function enterTopic<TInitArgs, TContextData, TNewInitArgs, TNewCont
     data: await newTopic.init(args, session),
     topic: newTopic,
     parentTopic: topic,
-    yakSession,
     activeHooks: [],
     disabledHooks: [],
     cb
   };
 
   if (newTopic.isRoot) {
-    yakSession.contexts = [newContext];
+    conversation.contexts = [newContext];
   } else {
-    yakSession.contexts.push(newContext);
+    conversation.contexts.push(newContext);
   }
 
   if (newTopic.afterInit) {
-    await newTopic.afterInit({ context: newContext, session }, session);
+    await newTopic.afterInit({ context: newContext, conversation, yakSession, session }, session);
   }
 }
 
@@ -119,18 +119,18 @@ export async function exitTopic<TInitArgs, TContextData>(
   state: StateType,
   args: Object
 ) : Promise<?Object> {
-  const yakSession = state.context.yakSession;
+  const { context, conversation, yakSession, session } = state;
 
-  if (state.context !== activeContext(yakSession)) {
+  if (context !== activeContext(conversation)) {
     throw new Error("You can only exit from the current context.");
   }
 
-  const lastContext = yakSession.contexts.pop();
+  const lastContext = conversation.contexts.pop();
 
   if (lastContext.cb) {
     const cb: any = lastContext.cb; //keep flow happy. FIXME
-    const parentContext = activeContext(yakSession);
-    return await cb({ context: parentContext, session: state.session }, args);
+    const parentContext = activeContext(conversation);
+    return await cb({ context: parentContext, conversation, yakSession, session: state.session }, args);
   }
 }
 
@@ -160,23 +160,25 @@ async function runHook(hook: HookType, state: StateType, message?: IncomingMessa
 async function processMessage<TMessage: IncomingMessageType>(
   session: ExternalSessionType,
   message: TMessage,
+  conversation: ConversationType,
   yakSession: YakSessionType,
-  globalTopic,
-  globalContext
+  globalContext,
+  globalTopic: TopicType,
+  topics: Array<TopicType>
 ) : Promise<Array<OutgoingMessageType>> {
   let handlerResult: ?Array<OutgoingMessageType>;
 
-  const context = activeContext(yakSession);
+  const context = activeContext(conversation);
   /*
     Check the hooks in the local topic first.
   */
   let handled = false;
   if (context) {
-    const currentTopic = findTopic(context.topic.name, yakSession.topics);
+    const currentTopic = findTopic(context.topic.name, topics);
 
     if (currentTopic.hooks) {
       for (let hook of currentTopic.hooks) {
-        [handled, handlerResult] = await runHook(hook, { context, session }, message);
+        [handled, handlerResult] = await runHook(hook, { context, conversation, yakSession, session }, message);
         if (handled) {
           break;
         }
@@ -196,7 +198,7 @@ async function processMessage<TMessage: IncomingMessageType>(
         !context || context.activeHooks.includes(hook.name) ||
         (context.activeHooks.length === 0 && (context.disabledHooks.length === 0 || !context.disabledHooks.includes(hook.name)))
       ) {
-        [handled, handlerResult] = await runHook(hook, { context: (context || globalContext), session }, message);
+        [handled, handlerResult] = await runHook(hook, { context: (context || globalContext), conversation, yakSession, session }, message);
         if (handled) {
           break;
         }
@@ -206,43 +208,58 @@ async function processMessage<TMessage: IncomingMessageType>(
   return handlerResult ? [].concat(handlerResult) : [];
 }
 
-export async function clearYakSession(state: StateType) : Promise {
-  await libSession.clear(state.context.yakSession.id);
-  state.context.yakSession.clear = true;
+export async function clearConversation(state: StateType) : Promise {
+  await libSession.clear(state.conversation.id);
+  state.conversation.clear = true;
 }
 
-export function init(allTopics: Array<TopicType>, options: InitYakOptionsType) : TopicsHandler {
-  const globalTopic: TopicType = findTopic("global", allTopics);
-  const topics = allTopics.filter(t => t.name !== "global");
-
+export function init(topicsDict: TopicsDict, options: InitYakOptionsType) : TopicsHandler {
   const getSessionId = options.getSessionId;
   const getSessionType = options.getSessionType;
 
   return async function(
+    conversationId: string,
+    topicSelector: string,
     session: ExternalSessionType,
     message: IncomingMessageType
   ) : Promise<Array<OutgoingMessageType>> {
+
+    const allTopics: Array<TopicType> = topicsDict[topicSelector];
+    const globalTopic: TopicType = findTopic("global", allTopics);
+    const topics = allTopics.filter(t => t.name !== "global");
+
+    //Pick the right conversation
     const yakSession: YakSessionType = (await libSession.get(getSessionId(session), topics)) ||
-      { id: getSessionId(session), type: getSessionType(session), contexts: [], virgin: true, topics, clear: false };
+      { id: getSessionId(session), type: getSessionType(session), conversations: [], virgin: true, topics, clear: false };
 
-    const globalContext = { yakSession, activeHooks:[], disabledHooks: [], topic: globalTopic };
+    const arrConversation = yakSession.conversations.filter(c => c.id === conversationId);
+    const conversation: ConversationType = arrConversation.length ? arrConversation[0] : {
+      id: conversationId,
+      contexts: [],
+      virgin: true
+    }
+    if (!arrConversation.length) {
+      yakSession.conversations.push(conversation);
+    }
 
-    if (yakSession.virgin) {
-      yakSession.virgin = false;
-      const mainTopic = findTopic("main", yakSession.topics);
+    const globalContext = { activeHooks:[], disabledHooks: [], topic: globalTopic };
+
+    if (conversation.virgin) {
+      conversation.virgin = false;
+      const mainTopic = findTopic("main", topics);
       if (mainTopic) {
         await enterTopic(
           globalTopic,
-          { context: globalContext, session },
+          { context: globalContext, conversation, yakSession, session },
           mainTopic,
           undefined
         );
       }
     }
 
-    const results: Array<OutgoingMessageType> = await processMessage(session, message, yakSession, globalTopic, globalContext);
+    const results: Array<OutgoingMessageType> = await processMessage(session, message, conversation, yakSession, globalContext, globalTopic, topics);
 
-    if (!yakSession.clear) {
+    if (!conversation.clear) {
       await libSession.save(yakSession);
     } else {
       yakSession.clear = false;
