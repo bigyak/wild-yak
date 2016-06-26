@@ -1,6 +1,6 @@
 {
   "name": "wild-yak",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "author": "Yak<yak@agilehead.com>",
   "main": "dist/wild-yak",
   "scripts": {

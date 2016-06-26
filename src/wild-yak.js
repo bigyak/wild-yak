@@ -211,7 +211,7 @@ async function processMessage<TMessage: IncomingMessageType>(
 }
 
 export async function clearConversation<TContextData>(state: StateType<TContextData>) : Promise<void> {
-  await libSession.clear(state.conversation.id);
+  await libSession.clear(state.yakSession.id);
   state.conversation.clear = true;
 }
 
@@ -232,7 +232,7 @@ export function init(topicsDict: TopicsDict, options: InitYakOptionsType) : Topi
 
     //Pick the right conversation
     const yakSession: YakSessionType = (await libSession.get(getSessionId(session), topics)) ||
-      { id: getSessionId(session), type: getSessionType(session), conversations: [], virgin: true, topics, clear: false };
+      { id: getSessionId(session), type: getSessionType(session), conversations: [], virgin: true, topics };
 
     const arrConversation = yakSession.conversations.filter(c => c.id === conversationId);
     const conversation: ConversationType = arrConversation.length ? arrConversation[0] : {
