@@ -25,7 +25,7 @@ export default function getTopics(options) {
       afterInit: async (state) => {
         if (env.enterTopic_assertTopContextTest || env.exitTopic_assertTopContextTest) {
           env._mainState = state;
-          await enterTopic(mainTopic, state, nicknameTopic)
+          await enterTopic(state, nicknameTopic, mainTopic)
         }
         if (env.clearConversation_test) {
           await clearConversation(state);
@@ -33,7 +33,6 @@ export default function getTopics(options) {
       },
       hooks: [
         defPattern(
-          mainTopic,
           "respond-to-hello",
           [/^Hello (.*)$/],
           async (state, { matches }) => {
@@ -41,7 +40,6 @@ export default function getTopics(options) {
           }
         ),
         defHook(
-          mainTopic,
           "boomshanker",
           async (state, message) => {
             if (message.text === "Boomshanker") {
@@ -65,11 +63,11 @@ export default function getTopics(options) {
       isRoot: true,
       afterInit: async () => {
         if (env.enterTopic_assertTopContextTest) {
-          await enterTopic(mathTopic, env._mainState, defaultTopic);
+          await enterTopic(env._mainState, defaultTopic, mathTopic);
         }
 
         if (env.exitTopic_assertTopContextTest) {
-          await exitTopic(mathTopic, env._mainState);
+          await exitTopic(env._mainState);
         }
       }
     }
@@ -135,14 +133,13 @@ export default function getTopics(options) {
       },
       hooks: [
         defPattern(
-          signupTopic,
           "validate",
           [/^name$/],
           async (state, { matches }) => {
             await enterTopic(
-              signupTopic,
               state,
               validateTopic,
+              signupTopic,
               undefined,
               onValidateName
             );
@@ -160,11 +157,10 @@ export default function getTopics(options) {
     {
       hooks: [
         defPattern(
-          signupTopic,
           "validate",
           [/^name (.*)$/],
           async (state, { matches }) => {
-            await exitTopic(validateTopic, state, { success: true });
+            await exitTopic(state, { success: true });
           }
         )
       ]
@@ -188,15 +184,13 @@ export default function getTopics(options) {
       isRoot: true,
       hooks: [
         defPattern(
-          globalTopic,
           "nickname",
           [/^nick ([A-z]\w*)$/, /^nickname ([A-z]\w*)$/],
           async (state, { matches }) => {
-            await enterTopic(globalTopic, state, nicknameTopic, matches[1])
+            await enterTopic(state, nicknameTopic, globalTopic, matches[1])
           }
         ),
         defHook(
-          globalTopic,
           "calc",
           async (state, message) => {
             const regex = /^[0-9\(\)\+\-*/\s]+$/;
@@ -209,41 +203,37 @@ export default function getTopics(options) {
             }
           },
           async (state, result) => {
-            await enterTopic(globalTopic, state, mathTopic, result);
+            await enterTopic(state, mathTopic, globalTopic, result);
           }
         ),
         defPattern(
-          globalTopic,
           "wildcard",
           [/^wildcard ([A-z].*)$/, /^wild ([A-z].*)$/],
           async (state, { matches }) => {
-            await enterTopic(globalTopic, state, wildcardTopic, matches[1]);
+            await enterTopic(state, wildcardTopic, globalTopic, matches[1]);
           }
         ),
         defPattern(
-          globalTopic,
           "mathexp",
           [/^5 \+ 10$/, /^100\/4$/],
           async (state, { matches }) => {
-            await enterTopic(globalTopic, state, mathExpTopic, matches[0]);
+            await enterTopic(state, mathExpTopic, globalTopic, matches[0]);
           }
         ),
         defPattern(
-          globalTopic,
           "signup",
           [/^signup (.*)$/, /^100\/4$/],
           async (state, { matches }) => {
-            await enterTopic(globalTopic, state, signupTopic, matches[1]);
+            await enterTopic(state, signupTopic, globalTopic, matches[1]);
           }
         ),
         defHook(
-          globalTopic,
           "default",
           async (state, message) => {
             return message
           },
           async (state, message) => {
-            await enterTopic(globalTopic, state, defaultTopic, message);
+            await enterTopic(state, defaultTopic, globalTopic, message);
           }
         ),
       ]

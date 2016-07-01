@@ -28,8 +28,7 @@ export function defTopic<TInitArgs, TContextData>(
   };
 }
 
-export function defPattern<TInitArgs, TContextData, THandlerResult: HookResultType>(
-  topic: TopicType<TInitArgs, TContextData>,
+export function defPattern<TContextData, THandlerResult: HookResultType>(
   name: string,
   patterns: Array<RegExp>,
   handler: HandlerFuncType<TContextData, RegexParseResultType, THandlerResult>
@@ -52,8 +51,7 @@ export function defPattern<TInitArgs, TContextData, THandlerResult: HookResultTy
 }
 
 
-export function defHook<TInitArgs, TContextData, TMessage: IncomingMessageType, TParseResult, THandlerResult: HookResultType>(
-  topic: TopicType<TInitArgs, TContextData>,
+export function defHook<TContextData, TMessage: IncomingMessageType, TParseResult, THandlerResult: HookResultType>(
   name: string,
   parse: ParseFuncType<TContextData, TMessage, TParseResult>,
   handler: HandlerFuncType<TContextData, TParseResult, THandlerResult>
@@ -76,12 +74,12 @@ function findTopic(name: string, topics: Array<TopicType<any, any>>) : TopicType
 }
 
 
-export async function enterTopic<TInitArgs, TContextData, TNewInitArgs, TNewContextData, TCallbackArgs, TCallbackResult: HookResultType>(
-  topic: TopicType<TInitArgs, TContextData>,
-  state: StateType<TContextData>,
+export async function enterTopic<TParentInitArgs, TParentContextData, TNewInitArgs, TNewContextData, TCallbackArgs, TCallbackResult: HookResultType>(
+  state: StateType<TParentContextData>,
   newTopic: TopicType<TNewInitArgs, TNewContextData>,
+  parentTopic: TopicType<TParentInitArgs, TParentContextData>,
   args: TNewInitArgs,
-  cb?: HandlerFuncType<TContextData, TCallbackArgs, TCallbackResult>
+  cb?: HandlerFuncType<TParentContextData, TCallbackArgs, TCallbackResult>
 ) : Promise<void> {
   const { context: currentContext, conversation, yakSession, session } = state;
 
@@ -94,7 +92,7 @@ export async function enterTopic<TInitArgs, TContextData, TNewInitArgs, TNewCont
   const newContext: ContextType<TNewContextData> = {
     data: await newTopic.init(args, session),
     topic: newTopic,
-    parentTopic: topic,
+    parentTopic,
     activeHooks: [],
     disabledHooks: [],
     cb
@@ -112,8 +110,7 @@ export async function enterTopic<TInitArgs, TContextData, TNewInitArgs, TNewCont
 }
 
 
-export async function exitTopic<TInitArgs, TContextData>(
-  topic: TopicType<TInitArgs, TContextData>,
+export async function exitTopic<TContextData>(
   state: StateType<TContextData>,
   args: Object
 ) : Promise<?Object> {
@@ -251,9 +248,9 @@ export function init(topicsDict: TopicsDict, options: InitYakOptionsType) : Topi
       const mainTopic = findTopic("main", topics);
       if (mainTopic) {
         await enterTopic(
-          globalTopic,
           { context: globalContext, conversation, yakSession, session },
           mainTopic,
+          globalTopic,
           undefined
         );
       }
