@@ -1,5 +1,4 @@
 import { defTopic, defPattern, defHook, enterTopic, exitTopic, disableHooks, disableHooksExcept, clearConversation } from "../wild-yak";
-import type { TopicType, HookType, RegexParseResultType, StateType } from "../types";
 
 export default function getTopics(options) {
 
