@@ -287,9 +287,9 @@ async function runHook<TContextData>(
 
 
 async function processMessage<TMessage: IncomingMessageType>(
-  userData?: UserDataType,
   message: TMessage,
   conversation: ConversationType,
+  userData?: UserDataType,
   globalContext,
   globalTopic: TopicType<any, any>,
   topics: Array<TopicType<any, any>>
@@ -365,7 +365,7 @@ export function init(allTopics: Array<TopicType<any, any>>, options: InitYakOpti
       }
     }
 
-    const results = await processMessage(userData, message, conversation, globalContext, globalTopic, topics);
+    const results = await processMessage(message, conversation, userData, globalContext, globalTopic, topics);
 
     return {
       conversation,
