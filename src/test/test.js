@@ -2,7 +2,6 @@ import __polyfill from "babel-polyfill";
 import should from "should";
 import { init, enterTopic, exitTopic, disableHooks, disableHooksExcept } from "../wild-yak";
 import getTopics from "./topics";
-import * as libSession from "../lib/session";
 
 describe("Wild yak", () => {
 
@@ -14,249 +13,173 @@ describe("Wild yak", () => {
     }
   }
 
-  function getSessionId(session) { return session.id; }
-  function getSessionType(session) { return session.type; }
+  function getSessionId(userData) { return userData.id; }
+  function getSessionType(userData) { return userData.type; }
 
   it("init() returns a handler", async () => {
     const { env, topics } = getTopics();
-    const handler = await init(topics, {getSessionId, getSessionType});
+    const handler = await init(topics);
     handler.should.be.an.instanceOf(Function);
   });
 
   it("Enters topic main while starting", async () => {
-    const session = getSession();
     const { env, topics } = getTopics({ includeMain: true });
-    const conversationId = "1123";
-    const topicSelector = "maintopics";
-
     const message = { text: "Hello world" };
-
-    const handler = await init(topics, {getSessionId, getSessionType});
-    await handler(conversationId, topicSelector, session, message);
+    const handler = await init(topics);
+    await handler(message);
 
     env._enteredMain.should.be.true("Entered main");
   });
 
 
   it("Returns a message from a pattern", async () => {
-    const session = getSession();
     const { env, topics } = getTopics({ includeMain: true });
-    const conversationId = "1123";
-    const topicSelector = "maintopics";
-
     const message = { text: "Hello world" };
-
-    const handler = await init(topics, {getSessionId, getSessionType});
-    const result = await handler(conversationId, topicSelector, session, message);
+    const handler = await init(topics);
+    const result = await handler(message);
 
     env._enteredMain.should.be.true("Entered main");
-    result[0].text.should.equal("hey, what's up!");
+    result.messages[0].text.should.equal("hey, what's up!");
   });
 
 
   it("Returns a message from a hook", async () => {
-    const session = getSession();
     const { env, topics } = getTopics({ includeMain: true });
-    const conversationId = "1123";
-    const topicSelector = "maintopics";
-
     const message = { text: "Boomshanker" };
-
-    const handler = await init(topics, {getSessionId, getSessionType});
-    const result = await handler(conversationId, topicSelector, session, message);
+    const handler = await init(topics);
+    const result = await handler(message);
 
     env._enteredMain.should.be.true("Entered main");
-    result[0].text.should.equal("omg zomg!");
+    result.messages[0].text.should.equal("omg zomg!");
   });
 
 
   it("Runs a topic when pattern matches", async () => {
-    const session = getSession();
     const { env, topics } = getTopics();
-    const conversationId = "1123";
-    const topicSelector = "maintopics";
-
     const message = { text: "nickname yakyak" };
-
-    const handler = await init(topics, {getSessionId, getSessionType});
-    await handler(conversationId, topicSelector, session, message);
+    const handler = await init(topics);
+    await handler(message);
 
     env._enteredNickname.should.be.true("Entered nickname");
   });
 
 
   it("Runs a custom hook (non-regex)", async () => {
-    const session = getSession();
     const { env, topics } = getTopics();
-    const conversationId = "1123";
-    const topicSelector = "maintopics";
-
     const message = { text: "5 + 10" };
-
-    const handler = await init(topics, { getSessionId, getSessionType });
-    await handler(conversationId, topicSelector, session, message);
+    const handler = await init(topics);
+    await handler(message);
 
     env._enteredMath.should.be.true("Entered math");
   });
 
 
   it("Run the default hook if nothing matches", async () => {
-    const session = getSession();
     const { env, topics } = getTopics();
-    const conversationId = "1123";
-    const topicSelector = "maintopics";
-
     const message = { text: "somethingweird" };
-
-    const handler = await init(topics, {getSessionId, getSessionType});
-    await handler(conversationId, topicSelector, session, message);
+    const handler = await init(topics);
+    await handler(message);
 
     env._enteredDefault.should.be.true("Entered default");
   });
 
 
   it("Disables hooks", async () => {
-    const session = getSession();
     const { env, topics } = getTopics();
-    const conversationId = "1123";
-    const topicSelector = "maintopics";
-
     const message = { text: "wildcard going to be alone" };
-    const message2 = { text: "nickname yakyak" };
+    const handler = await init(topics);
+    await handler(message);
 
-    const handler = await init(topics, {getSessionId, getSessionType});
-
-    await handler(conversationId, topicSelector, session, message);
     env._enteredWildcard.should.be.true("Entered wildcard");
   });
 
 
   it("Runs a hook for each message", async () => {
-    const session = getSession();
     const { env, topics } = getTopics();
-    const conversationId = "1123";
-    const topicSelector = "maintopics";
-
     const message = { text: "wildcard going to be alone" };
-    const message2 = { text: "nickname yakyak" };
-
-    const handler = await init(topics, {getSessionId, getSessionType});
-
+    const handler = await init(topics);
     env._disabled = ["nickname"];
-    await handler(conversationId, topicSelector, session, message);
+    const result = await handler(message);
+
     env._enteredWildcard.should.be.true("Entered wildcard");
 
-    await handler(conversationId, topicSelector, session, message2);
+    const message2 = { text: "nickname yakyak" };
+    await handler(message2, result.conversation);
+
     env._enteredDefault.should.be.true("Entered default");
   });
 
 
   it("Disables hooks except specified hooks", async () => {
-    const session = getSession();
     const { env, topics } = getTopics();
-    const conversationId = "1123";
-    const topicSelector = "maintopics";
-
     const message = { text: "wildcard disableHooksExcept mathexp" };
-    const message2 = { text: "5 + 10" };
-
-    const handler = await init(topics, {getSessionId, getSessionType});
-
+    const handler = await init(topics);
     env._enabled = ["mathexp"];
-    await handler(conversationId, topicSelector, session, message);
+    const result = await handler(message);
+
     env._enteredWildcard.should.be.true("Entered wildcard");
 
-    await handler(conversationId, topicSelector, session, message2);
+    const message2 = { text: "5 + 10" };
+    await handler(message2, result.conversation);
+
     env._enteredMathExp.should.be.true("Entered mathexp");
   });
 
 
   it("Receives result from sub topic via callback", async () => {
-    const session = getSession();
     const { env, topics } = getTopics();
-    const conversationId = "1123";
-    const topicSelector = "maintopics";
-
     const message = { text: "signup Yak" };
-    const message2 = { text: "name" };
-    const message3 = { text: "name Hemchand" };
-
-    const handler = await init(topics, {getSessionId, getSessionType});
-    await handler(conversationId, topicSelector, session, message);
+    const handler = await init(topics);
+    const result1 = await handler(message);
     env._enteredSignup.should.be.true("Entered signup");
 
-    await handler(conversationId, topicSelector, session, message2);
-    await handler(conversationId, topicSelector, session, message3);
+    const message2 = { text: "name" };
+    const result2 = await handler(message2, result1.conversation);
+
+    const message3 = { text: "name Hemchand" };
+    await handler(message3, result2.conversation);
+
     env._enteredValidate.should.be.true("Executed onValidatename");
     env._enteredOnValidateName.should.be.true();
   });
 
 
   it("Throws error on enterTopic() if the provided context isn't on the top of the stack", async () => {
-    const session = getSession();
     const { env, topics } = getTopics({ includeMain: true });
-    const conversationId = "1123";
-    const topicSelector = "maintopics";
-
     const message = { text: "Hello world" };
-
-    const handler = await init(topics, { getSessionId, getSessionType });
+    const handler = await init(topics);
 
     env.enterTopic_assertTopContextTest = true;
+
     let _threwError = false;
     try {
-      await handler(conversationId, topicSelector, session, message);
+      await handler(message);
     } catch(e) {
       _threwError = true;
       e.message.should.equal("You can only enter a new context from the last context.");
     }
+
     _threwError.should.be.true();
   });
 
 
   it("Throws error on exitTopic() if the provided context isn't on the top of the stack", async () => {
-    const session = getSession();
     const { env, topics } = getTopics({ includeMain: true });
-    const conversationId = "1123";
-    const topicSelector = "maintopics";
-
     const message = { text: "Hello world" };
 
-    const handler = await init(topics, { getSessionId, getSessionType });
+    const handler = await init(topics);
 
     env.exitTopic_assertTopContextTest = true;
+
     let _threwError = false;
     try {
-      await handler(conversationId, topicSelector, session, message);
+      await handler(message);
     } catch(e) {
       _threwError = true;
       e.message.should.equal("You can only exit from the current context.");
     }
+
     _threwError.should.be.true();
-  });
-
-
-  it("Returns a message from a hook", async () => {
-    const session = getSession();
-    const { env, topics } = getTopics({ includeMain: true });
-    const conversationId = "1123";
-    const topicSelector = "maintopics";
-
-    const message = { text: "Boomshanker" };
-
-    const handler = await init(topics, {getSessionId, getSessionType});
-
-    env.clearConversation_test = true;
-
-    const result = await handler(conversationId, topicSelector, session, message);
-    env._enteredMain.should.be.true("First message: Entered main");
-    env._enteredMain = false;
-    result[0].text.should.equal("omg zomg!");
-
-    //#REPEAT IT
-    const message2 = { text: "somethingweird" };
-    const result2 = await handler(conversationId, topicSelector, session, message2);
-    env._enteredMain.should.be.true("Second message: Entered main");
   });
 
 })

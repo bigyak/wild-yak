@@ -1,18 +1,14 @@
 /* @flow */
-import * as libSession from "./lib/session";
 
 /*
-  Represents the application controlled session state
+  Represents the application controlled userData state
 */
-export type ExternalSessionType = Object;
+export type UserDataType = Object;
 
 /*
   Options passed in by the calling external program
 */
-export type InitYakOptionsType = {
-  getSessionId: (session: ExternalSessionType) => string,
-  getSessionType: (session: ExternalSessionType) => string
-}
+export type InitYakOptionsType = {}
 
 /*
   Message types that will be passed to the Yak
@@ -38,7 +34,20 @@ export type OutgoingStringMessageType = { type: "string", text: string };
 export type OptionMessageType = { type: "option", values: Array<string> };
 export type OutgoingMessageType = string | OutgoingStringMessageType | OptionMessageType;
 
+/*
+  The replies you might get from the hook.
+*/
 export type HookResultType = OutgoingMessageType | Array<OutgoingMessageType>;
+
+/*
+  WildYak's response after a message is processed.
+  We pass back the changed session also.
+  The caller should pass the same session back when calling again.
+*/
+export type YakResponseType = {
+  conversation: ConversationType,
+  messages: HookResultType
+}
 
 /*
   Definition of a Topic.
@@ -50,18 +59,11 @@ export type TopicParams<TContextData> = {
 
 export type TopicType<TInitArgs, TContextData> = {
   name: string,
-  init: (args: TInitArgs, session: ExternalSessionType) => Promise<TContextData>,
+  init: (args: TInitArgs, userData?: UserDataType) => Promise<TContextData>,
   isRoot: boolean,
   callbacks?: { [key: string]: (state: any, params: any) => Promise<any> },
   hooks: Array<HookType<TContextData, Object, ?Object, HookResultType>>,
   afterInit?: ?(state: StateType<TContextData>) => Promise<any>
-}
-
-/*
-  The topics dictionary
-*/
-export type TopicsDict = {
-  [key: string]: Array<TopicType<any, any>>
 }
 
 /*
@@ -76,24 +78,12 @@ export type ContextType<TContextData> = {
   cb?: Function
 }
 
-
 /*
   Conversations contain all the contexts.
 */
 export type ConversationType = {
-  id: string,
   contexts: Array<ContextType<any>>,
   virgin: boolean,
-  clear?: boolean
-}
-
-/*
-  Yak Session contains Yak specific state.
-  Like conversations, virginity etc.
-*/
-export type YakSessionType = {
-  conversations: Array<ConversationType>,
-  id: string
 }
 
 /*
@@ -119,15 +109,14 @@ export type HookType<TContextData, TMessage: IncomingMessageType, TParseResult, 
 
 /*
   State that is passed into every function.
-  Contains a context and an external session.
-  The external session helps the topic work with application state.
-  eg: session.shoppingCart.items.count
+  Contains a context and an external userData.
+  The external userData helps the topic work with application state.
+  eg: userData.shoppingCart.items.count
 */
 export type StateType<TContextData> = {
   context: ContextType<TContextData>,
   conversation: ConversationType,
-  yakSession: YakSessionType,
-  session: ExternalSessionType
+  userData?: UserDataType
 }
 
 /*
@@ -143,11 +132,15 @@ export type RegexParseResultType = {
 /*
   Handler returned to the external app. This is the entry point into Wild Yak
 */
-export type TopicsHandler = (conversationId: string, topicSelector: string, session: ExternalSessionType, message: IncomingMessageType) => Promise<HookResultType>
+export type TopicsHandlerType = (
+  message: IncomingMessageType,
+  conversation?: ConversationType,
+  userData?: UserDataType,
+) => Promise<YakResponseType>
 
 export function defTopic<TInitArgs, TContextData>(
   name: string,
-  init: (args: TInitArgs, session: ExternalSessionType) => Promise<TContextData>,
+  init: (args: TInitArgs, userData?: UserDataType) => Promise<TContextData>,
   options: {
     isRoot?: boolean,
     hooks?: Array<HookType<TContextData, IncomingMessageType, ?Object, HookResultType>>,
@@ -218,7 +211,7 @@ export async function enterTopic<TParentInitArgs, TParentContextData, TNewInitAr
   args: TNewInitArgs,
   cb?: HandlerFuncType<TParentContextData, TCallbackArgs, TCallbackResult>
 ) : Promise<void> {
-  const { context: currentContext, conversation, yakSession, session } = state;
+  const { context: currentContext, conversation, userData } = state;
 
   const contextOnStack = activeContext(conversation);
 
@@ -227,7 +220,7 @@ export async function enterTopic<TParentInitArgs, TParentContextData, TNewInitAr
   }
 
   const newContext: ContextType<TNewContextData> = {
-    data: await newTopic.init(args, session),
+    data: await newTopic.init(args, userData),
     topic: newTopic,
     parentTopic,
     activeHooks: [],
@@ -242,7 +235,7 @@ export async function enterTopic<TParentInitArgs, TParentContextData, TNewInitAr
   }
 
   if (newTopic.afterInit) {
-    await newTopic.afterInit({ context: newContext, conversation, yakSession, session }, session);
+    await newTopic.afterInit({ context: newContext, conversation, userData }, userData);
   }
 }
 
@@ -251,7 +244,7 @@ export async function exitTopic<TContextData>(
   state: StateType<TContextData>,
   args: Object
 ) : Promise<?Object> {
-  const { context, conversation, yakSession, session } = state;
+  const { context, conversation, userData } = state;
 
   if (context !== activeContext(conversation)) {
     throw new Error("You can only exit from the current context.");
@@ -262,7 +255,7 @@ export async function exitTopic<TContextData>(
   if (lastContext.cb) {
     const cb: any = lastContext.cb; //keep flow happy. FIXME
     const parentContext = activeContext(conversation);
-    return await cb({ context: parentContext, conversation, yakSession, session: state.session }, args);
+    return await cb({ context: parentContext, conversation, userData: state.userData }, args);
   }
 }
 
@@ -282,7 +275,7 @@ async function runHook<TContextData>(
   state: StateType<TContextData>,
   message?: IncomingMessageType
 ) : Promise<[boolean, ?HookResultType]> {
-  const { context, session } = state;
+  const { context, userData } = state;
   const parseResult = await hook.parse(state, message);
   if (parseResult !== undefined) {
     const handlerResult = await hook.handler(state, parseResult);
@@ -294,10 +287,9 @@ async function runHook<TContextData>(
 
 
 async function processMessage<TMessage: IncomingMessageType>(
-  session: ExternalSessionType,
+  userData?: UserDataType,
   message: TMessage,
   conversation: ConversationType,
-  yakSession: YakSessionType,
   globalContext,
   globalTopic: TopicType<any, any>,
   topics: Array<TopicType<any, any>>
@@ -314,7 +306,7 @@ async function processMessage<TMessage: IncomingMessageType>(
 
     if (currentTopic.hooks) {
       for (let hook of currentTopic.hooks) {
-        [handled, handlerResult] = await runHook(hook, { context, conversation, yakSession, session }, message);
+        [handled, handlerResult] = await runHook(hook, { context, conversation, userData }, message);
         if (handled) {
           break;
         }
@@ -334,7 +326,11 @@ async function processMessage<TMessage: IncomingMessageType>(
         !context || context.activeHooks.includes(hook.name) ||
         (context.activeHooks.length === 0 && (context.disabledHooks.length === 0 || !context.disabledHooks.includes(hook.name)))
       ) {
-        [handled, handlerResult] = await runHook(hook, { context: (context || globalContext), conversation, yakSession, session }, message);
+        [handled, handlerResult] = await runHook(
+          hook,
+          { context: (context || globalContext), conversation, userData },
+          message
+        );
         if (handled) {
           break;
         }
@@ -344,39 +340,15 @@ async function processMessage<TMessage: IncomingMessageType>(
   return handlerResult ? [].concat(handlerResult) : [];
 }
 
-export async function clearConversation<TContextData>(state: StateType<TContextData>) : Promise<void> {
-  await libSession.clear(state.yakSession.id);
-  state.conversation.clear = true;
-}
-
-export function init(topicsDict: TopicsDict, options: InitYakOptionsType) : TopicsHandler {
-  const getSessionId = options.getSessionId;
-  const getSessionType = options.getSessionType;
-
+export function init(allTopics: Array<TopicType<any, any>>, options: InitYakOptionsType = {}) : TopicsHandlerType {
   return async function(
-    conversationId: string,
-    topicSelector: string,
-    session: ExternalSessionType,
-    message: IncomingMessageType
-  ) : Promise<HookResultType> {
+    message: IncomingMessageType,
+    conversation = { contexts: [], virgin: true },
+    userData?: UserDataType,
+  ) : Promise<YakResponseType> {
 
-    const allTopics: Array<TopicType<any, any>> = topicsDict[topicSelector];
-    const globalTopic: TopicType<any, any> = findTopic("global", allTopics);
+    const globalTopic = findTopic("global", allTopics);
     const topics = allTopics.filter(t => t.name !== "global");
-
-    //Pick the right conversation
-    const yakSession: YakSessionType = (await libSession.get(getSessionId(session), topics)) ||
-      { id: getSessionId(session), type: getSessionType(session), conversations: [], virgin: true, topics };
-
-    const arrConversation = yakSession.conversations.filter(c => c.id === conversationId);
-    const conversation: ConversationType = arrConversation.length ? arrConversation[0] : {
-      id: conversationId,
-      contexts: [],
-      virgin: true
-    }
-    if (!arrConversation.length) {
-      yakSession.conversations.push(conversation);
-    }
 
     const globalContext = { activeHooks:[], disabledHooks: [], topic: globalTopic };
 
@@ -385,7 +357,7 @@ export function init(topicsDict: TopicsDict, options: InitYakOptionsType) : Topi
       const mainTopic = findTopic("main", topics);
       if (mainTopic) {
         await enterTopic(
-          { context: globalContext, conversation, yakSession, session },
+          { context: globalContext, conversation, userData },
           mainTopic,
           globalTopic,
           undefined
@@ -393,12 +365,11 @@ export function init(topicsDict: TopicsDict, options: InitYakOptionsType) : Topi
       }
     }
 
-    const results = await processMessage(session, message, conversation, yakSession, globalContext, globalTopic, topics);
+    const results = await processMessage(userData, message, conversation, globalContext, globalTopic, topics);
 
-    if (!conversation.clear) {
-      await libSession.save(yakSession);
-    }
-
-    return results.map(r => typeof r === "string" ? { type: "string", text: r } : r);
+    return {
+      conversation,
+      messages: results.map(r => typeof r === "string" ? { type: "string", text: r } : r)
+    };
   }
 }

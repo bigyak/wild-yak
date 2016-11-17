@@ -1,4 +1,4 @@
-import { defTopic, defPattern, defHook, enterTopic, exitTopic, disableHooks, disableHooksExcept, clearConversation } from "../wild-yak";
+import { defTopic, defPattern, defHook, enterTopic, exitTopic, disableHooks, disableHooksExcept } from "../wild-yak";
 
 export default function getTopics(options) {
 
@@ -16,7 +16,7 @@ export default function getTopics(options) {
 
   const mainTopic = defTopic(
     "main",
-    async (args, session) => {
+    async (args, userData) => {
       env._enteredMain = true;
     },
     {
@@ -25,9 +25,6 @@ export default function getTopics(options) {
         if (env.enterTopic_assertTopContextTest || env.exitTopic_assertTopContextTest) {
           env._mainState = state;
           await enterTopic(state, nicknameTopic, mainTopic)
-        }
-        if (env.clearConversation_test) {
-          await clearConversation(state);
         }
       },
       hooks: [
@@ -55,7 +52,7 @@ export default function getTopics(options) {
 
   const nicknameTopic = defTopic(
     "nickname",
-    async (args, session) => {
+    async (args, userData) => {
       env._enteredNickname = true;
     },
     {
@@ -74,7 +71,7 @@ export default function getTopics(options) {
 
   const mathTopic = defTopic(
     "math",
-    async (args, session) => {
+    async (args, userData) => {
       env._enteredMath = true;
     },
     {
@@ -85,7 +82,7 @@ export default function getTopics(options) {
 
   const wildcardTopic = defTopic(
     "wildcard",
-    async (args, session) => {
+    async (args, userData) => {
       env._enteredWildcard = true;
     },
     {
@@ -104,7 +101,7 @@ export default function getTopics(options) {
 
   const mathExpTopic = defTopic(
     "mathexp",
-    async (args, session) => {
+    async (args, userData) => {
       env._enteredMathExp = true;
     },
     {
@@ -122,7 +119,7 @@ export default function getTopics(options) {
 
   const signupTopic = defTopic(
     "signup",
-    async (args, session) => {
+    async (args, userData) => {
       env._enteredSignup = true;
     },
     {
@@ -150,7 +147,7 @@ export default function getTopics(options) {
 
   const validateTopic = defTopic(
     "validate",
-    async (args, session) => {
+    async (args, userData) => {
       env._enteredValidate = true;
     },
     {
@@ -168,7 +165,7 @@ export default function getTopics(options) {
 
   const defaultTopic = defTopic(
     "default",
-    async (args, session) => {
+    async (args, userData) => {
       env._enteredDefault = true;
     },
     {
@@ -178,7 +175,7 @@ export default function getTopics(options) {
 
   const globalTopic = defTopic(
     "global",
-    async (args, session) => {},
+    async (args, userData) => {},
     {
       isRoot: true,
       hooks: [
@@ -255,9 +252,6 @@ export default function getTopics(options) {
 
   return {
     env,
-    topics: {
-      maintopics: topics,
-      other: []
-    }
+    topics
   };
 }
