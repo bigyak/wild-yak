@@ -138,16 +138,19 @@ export type TopicsHandlerType = (
   userData?: UserDataType,
 ) => Promise<YakResponseType>
 
+export type TopicCtorType<TContextData> = {
+  isRoot?: boolean,
+  hooks?: Array<HookType<TContextData, IncomingMessageType, ?Object, HookResultType>>,
+  callbacks?: { [key: string]: (state: StateType<TContextData>, params: any) => Promise<any> },
+  afterInit?: ?(state: StateType<TContextData>) => Promise<any>
+}
+
 export function defTopic<TInitArgs, TContextData>(
   name: string,
   init: (args: TInitArgs, userData?: UserDataType) => Promise<TContextData>,
-  options: {
-    isRoot?: boolean,
-    hooks?: Array<HookType<TContextData, IncomingMessageType, ?Object, HookResultType>>,
-    callbacks?: { [key: string]: (state: StateType<TContextData>, params: any) => Promise<any> },
-    afterInit?: ?(state: StateType<TContextData>) => Promise<any>
-  }
+  fnTopicCtor: () => TopicCtorType<TContextData>
 ) : TopicType<TInitArgs, TContextData> {
+  const options = fnTopicCtor();
   return {
     name,
     isRoot: options.isRoot !== undefined ? options.isRoot : false,

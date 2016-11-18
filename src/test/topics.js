@@ -19,7 +19,7 @@ export default function getTopics(options) {
     async (args, userData) => {
       env._enteredMain = true;
     },
-    {
+    () => ({
       isRoot: true,
       afterInit: async (state) => {
         if (env.enterTopic_assertTopContextTest || env.exitTopic_assertTopContextTest) {
@@ -47,7 +47,7 @@ export default function getTopics(options) {
           }
         )
       ]
-    }
+    })
   );
 
   const nicknameTopic = defTopic(
@@ -55,7 +55,7 @@ export default function getTopics(options) {
     async (args, userData) => {
       env._enteredNickname = true;
     },
-    {
+    () => ({
       isRoot: true,
       afterInit: async () => {
         if (env.enterTopic_assertTopContextTest) {
@@ -66,7 +66,7 @@ export default function getTopics(options) {
           await exitTopic(env._mainState);
         }
       }
-    }
+    })
   );
 
   const mathTopic = defTopic(
@@ -74,9 +74,9 @@ export default function getTopics(options) {
     async (args, userData) => {
       env._enteredMath = true;
     },
-    {
+    () => ({
       isRoot: true
-    }
+    })
   );
 
 
@@ -85,7 +85,7 @@ export default function getTopics(options) {
     async (args, userData) => {
       env._enteredWildcard = true;
     },
-    {
+    () => ({
       isRoot: true,
       afterInit: async (state) => {
         if (env._disabled !== undefined) {
@@ -95,7 +95,7 @@ export default function getTopics(options) {
           disableHooksExcept(state, env._enabled);
         }
       }
-    }
+    })
   );
 
 
@@ -104,9 +104,9 @@ export default function getTopics(options) {
     async (args, userData) => {
       env._enteredMathExp = true;
     },
-    {
+    () => ({
       isRoot: true
-    }
+    })
   );
 
 
@@ -122,7 +122,7 @@ export default function getTopics(options) {
     async (args, userData) => {
       env._enteredSignup = true;
     },
-    {
+    () => ({
       isRoot: true,
       callbacks: {
         onValidateName
@@ -142,7 +142,7 @@ export default function getTopics(options) {
           }
         )
       ]
-    }
+    })
   );
 
   const validateTopic = defTopic(
@@ -150,7 +150,7 @@ export default function getTopics(options) {
     async (args, userData) => {
       env._enteredValidate = true;
     },
-    {
+    () => ({
       hooks: [
         defPattern(
           "validate",
@@ -160,7 +160,7 @@ export default function getTopics(options) {
           }
         )
       ]
-    }
+    })
   );
 
   const defaultTopic = defTopic(
@@ -168,15 +168,15 @@ export default function getTopics(options) {
     async (args, userData) => {
       env._enteredDefault = true;
     },
-    {
+    () => ({
       isRoot: false,
-    }
+    })
   );
 
   const globalTopic = defTopic(
     "global",
     async (args, userData) => {},
-    {
+    () => ({
       isRoot: true,
       hooks: [
         defPattern(
@@ -233,7 +233,7 @@ export default function getTopics(options) {
           }
         ),
       ]
-    }
+    })
   );
 
   const allTopics = [
