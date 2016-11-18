@@ -135,12 +135,28 @@ describe("Wild yak", () => {
 
     const message2 = { text: "name" };
     const result2 = await handler(message2, result1.conversation);
+    env._enteredValidate.should.be.true("Entered validate");
 
     const message3 = { text: "name Hemchand" };
-    await handler(message3, result2.conversation);
+    const result3 = await handler(message3, result2.conversation);
 
-    env._enteredValidate.should.be.true("Executed onValidatename");
-    env._enteredOnValidateName.should.be.true();
+    env._enteredOnValidateName.should.be.true("Executed onValidatename");
+    result3.conversation.contexts.length.should.equal(1);
+  });
+
+
+  it("Clears all topics", async () => {
+    const { env, topics } = getTopics();
+    env._clearAllTopics = true;
+    const message = { text: "signup Yak" };
+    const handler = await init(topics);
+    const result1 = await handler(message);
+    const message2 = { text: "name" };
+    const result2 = await handler(message2, result1.conversation);
+    const message3 = { text: "name Hemchand" };
+    const result3 = await handler(message3, result2.conversation);
+
+    result3.conversation.contexts.length.should.equal(0);
   });
 
 

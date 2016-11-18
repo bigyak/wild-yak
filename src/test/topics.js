@@ -1,4 +1,4 @@
-import { defTopic, defPattern, defHook, enterTopic, exitTopic, disableHooks, disableHooksExcept } from "../wild-yak";
+import { defTopic, defPattern, defHook, enterTopic, exitTopic, clearAllTopics, disableHooks, disableHooksExcept } from "../wild-yak";
 
 export default function getTopics(options) {
 
@@ -156,7 +156,11 @@ export default function getTopics(options) {
           "validate",
           [/^name (.*)$/],
           async (state, { matches }) => {
-            await exitTopic(state, { success: true });
+            if (!env._clearAllTopics) {
+              await exitTopic(state, { success: true });
+            } else {
+              await clearAllTopics(state);
+            }
           }
         )
       ]
@@ -218,7 +222,7 @@ export default function getTopics(options) {
         ),
         defPattern(
           "signup",
-          [/^signup (.*)$/, /^100\/4$/],
+          [/^signup (.*)$/],
           async (state, { matches }) => {
             await enterTopic(state, signupTopic, globalTopic, matches[1]);
           }

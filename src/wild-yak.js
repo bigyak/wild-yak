@@ -260,6 +260,17 @@ export async function exitTopic<TContextData>(
 }
 
 
+export async function clearAllTopics<TContextData>(state: StateType<TContextData>) : void {
+  const { context, conversation, userData } = state;
+
+  if (context !== activeContext(conversation)) {
+    throw new Error("You can only exit from the current context.");
+  }
+
+  conversation.contexts = [];
+}
+
+
 export function disableHooksExcept<TContextData>(state: StateType<TContextData>, list: Array<string>) : void {
   state.context.activeHooks = list;
 }
