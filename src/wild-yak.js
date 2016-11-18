@@ -138,25 +138,24 @@ export type TopicsHandlerType = (
   userData?: UserDataType,
 ) => Promise<YakResponseType>
 
-export type TopicOptionsType<TContextData> = {
-  isRoot?: boolean,
-  hooks?: Array<HookType<TContextData, IncomingMessageType, ?Object, HookResultType>>,
-  callbacks?: { [key: string]: (state: StateType<TContextData>, params: any) => Promise<any> },
-  afterInit?: ?(state: StateType<TContextData>) => Promise<any>
-}
-
 export function defTopic<TInitArgs, TContextData>(
   name: string,
   init: (args: TInitArgs, userData?: UserDataType) => Promise<TContextData>,
-) : (options: TopicOptionsType) => TopicType<TInitArgs, TContextData> {
-  return (options) => ({
+  options: {
+    isRoot?: boolean,
+    hooks?: Array<HookType<TContextData, IncomingMessageType, ?Object, HookResultType>>,
+    callbacks?: { [key: string]: (state: StateType<TContextData>, params: any) => Promise<any> },
+    afterInit?: ?(state: StateType<TContextData>) => Promise<any>
+  }
+) : TopicType<TInitArgs, TContextData> {
+  return {
     name,
     isRoot: options.isRoot !== undefined ? options.isRoot : false,
     init,
     callbacks: options.callbacks,
     hooks: options.hooks || [],
     afterInit: options.afterInit
-  });
+  };
 }
 
 export function defPattern<TContextData, THandlerResult: HookResultType>(
