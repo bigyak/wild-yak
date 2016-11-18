@@ -235,7 +235,7 @@ export async function enterTopic<TParentInitArgs, TParentContextData, TNewInitAr
   }
 
   if (newTopic.afterInit) {
-    await newTopic.afterInit({ context: newContext, conversation, userData }, userData);
+    await newTopic.afterInit({ context: newContext, conversation, userData });
   }
 }
 
