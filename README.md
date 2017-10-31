@@ -20,3 +20,8 @@ U: exit
 B: What do you wanna try today?
 [Math] [Physics]
 ```
+
+Usage can be seen in https://github.com/yak-ai/wild-yak/blob/master/src/test/topics.js
+It looks very ugly, sorry.
+
+Yes, this has been well tested in production.
