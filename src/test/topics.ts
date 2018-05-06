@@ -7,15 +7,15 @@ import {
   clearAllTopics,
   disableHooks,
   disableHooksExcept,
-  StateType,
-  UserDataType
+  ApplicationState,
+  UserData
 } from "../wild-yak";
 
 export interface GetTopicsOptions {
   includeMain: boolean;
 }
 
-export interface TestState extends StateType<{}> {}
+export interface TestState extends ApplicationState<{}> {}
 
 export interface EnvType {
   _mainState: any;
