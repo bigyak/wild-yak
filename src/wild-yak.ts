@@ -454,7 +454,7 @@ export function init<TMessage, TUserData>(
   options: IInitOptions = {}
 ): TopicsHandler<TMessage, TUserData | undefined> {
   return async function doInit(
-    input: any,
+    input: TMessage,
     contexts = { items: [], virgin: true },
     userData = undefined
   ): Promise<IResponse<TMessage, TUserData>> {
