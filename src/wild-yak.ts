@@ -1,6 +1,3 @@
-import { Context } from "vm";
-import { OutboundMessage } from "http";
-
 /* @flow */
 
 /*
@@ -11,79 +8,72 @@ export type UserData = any;
 /*
   Options passed in by the calling external program
 */
-export interface InitYakOptions {}
+export interface IInitYakOptions {}
 
 /*
-  WildYak's response after a message is processed.
-  We pass back the changed session also.
+  WildYak's response after an input is processed.
+  We pass back the changed session also. 
   The caller should pass the same session back when calling again.
 */
-export interface YakResponse {
-  conversation: Conversation;
-  messages: any[];
-}
-
-/*
-  Inbound messages - eg: { timestamp: 39458734895, value: "Hello!" }
-*/
-export interface InboundMessage<TMessage> {
-  timestamp?: number;
-  value: TMessage;
+export interface IResponse {
+  contextStack: IContextStack;
+  output: any[];
 }
 
 /*
   Definition of a Topic.
 */
-export interface Topic<TInitArgs, TContextData> {
+export interface ITopic<TInitArgs, TContextData> {
   name: string;
-  init: (args?: TInitArgs, userData?: UserData) => Promise<TContextData>;
+  init: (args?: TInitArgs, userData?: UserData) => Promise<TContextData | void>;
   isRoot: boolean;
   callbacks?: { [key: string]: (state: any, params: any) => Promise<any> };
-  hooks: Array<Hook<TContextData, any, any>>;
-  afterInit?: (state: ApplicationState<TContextData>) => Promise<any>;
+  hooks: Array<IHook<TContextData, any, any>>;
+  afterInit?: (state: IApplicationState<TContextData>) => Promise<any | void>;
 }
 
 /*
   Context. This is where each topic stores its state.
 */
-export interface ConversationContext<TContextData> {
-  data?: TContextData;
+export interface ITopicContext<TContextData> {
+  data?: TContextData | void;
   activeHooks: Array<string>;
   disabledHooks: Array<string>;
-  topic: Topic<any, TContextData>;
-  parentTopic?: Topic<any, any>;
+  topic: ITopic<any, TContextData>;
+  parentTopic?: ITopic<any, any>;
   cb?: Function;
 }
 
 /*
   Conversations contain all the contexts.
 */
-export interface Conversation {
-  contexts: Array<ConversationContext<any>>;
+export interface IContextStack {
+  contexts: Array<ITopicContext<any>>;
   virgin: boolean;
 }
 
 /*
-  Parse a message. Takes in a message and returns a ParseResult.
-  The ParseResult is passed on to the Handler.
+  Hooks have parser functions, which take an input and decide whether anything needs to be done with it.
+  If the parser returns a value, it is passed on to the handler. If the result is undefined, skip this hook.
 */
 export type ParseFunc<TContextData, TParseResult> = (
-  state: ApplicationState<TContextData>,
-  message: InboundMessage<any>
-) => Promise<TParseResult>;
+  state: IApplicationState<TContextData>,
+  input: any
+) => Promise<TParseResult | void>;
 
 /*
-  Recieves a ParseResult from the Parse() function. Handler can optionally return a result.
+  Recieves a ParseResult from the parse() function. 
+  Handler can optionally return a result.
 */
 export type HandlerFunc<TContextData, TParseResult, TOutboundMessage> = (
-  state: ApplicationState<TContextData>,
+  state: IApplicationState<TContextData>,
   args: TParseResult
 ) => Promise<TOutboundMessage>;
 
 /*
-  The Hook. Contains a name, a parse(): ParseFunc function, a handler(): HandlerFunc
+  The Hook. Contains a name, a parser and a handler.
 */
-export interface Hook<TContextData, TParseResult, TOutboundMessage> {
+export interface IHook<TContextData, TParseResult, TOutboundMessage> {
   name: string;
   parse: ParseFunc<TContextData, TParseResult>;
   handler: HandlerFunc<TContextData, TParseResult, TOutboundMessage>;
@@ -95,18 +85,17 @@ export interface Hook<TContextData, TParseResult, TOutboundMessage> {
   The external userData helps the topic work with application state.
   eg: userData.shoppingCart.items.count
 */
-export interface ApplicationState<TContextData> {
-  context: ConversationContext<TContextData>;
-  conversation: Conversation;
+export interface IApplicationState<TContextData> {
+  context: ITopicContext<TContextData>;
+  contextStack: IContextStack;
   userData?: UserData;
 }
 
 /*
-  The resume of a RegExp parser.
-  Contains original message, index of matched pattern, and a list of matches.
+  Contains original input, index of matched pattern, and a list of matches.
 */
-export interface RegexParseResult {
-  message: InboundMessage<string>;
+export interface IRegexParseResult {
+  input: string;
   i: number;
   matches: Array<string>;
 }
@@ -115,99 +104,83 @@ export interface RegexParseResult {
   Handler returned to the external app. This is the entry point into Wild Yak
 */
 export type TopicsHandler = (
-  message: InboundMessage<any>,
-  conversation?: Conversation,
+  input: any,
+  contextStack?: IContextStack,
   userData?: UserData
-) => Promise<YakResponse>;
+) => Promise<IResponse>;
 
-export function defTopic<TInitArgs, TContextData, OutboundMessage>(
+export function defTopic<TInitArgs, TContextData>(
   name: string,
-  init: (args?: TInitArgs, userData?: UserData) => Promise<TContextData>,
+  topicInit: (
+    args?: TInitArgs,
+    userData?: UserData
+  ) => Promise<TContextData | void>,
   options: {
     isRoot?: boolean;
-    hooks?: Array<Hook<TContextData, any, any>>;
+    hooks?: Array<IHook<TContextData, any, any>>;
     callbacks?: {
       [key: string]: (
-        state: ApplicationState<TContextData>,
+        state: IApplicationState<TContextData>,
         params: any
-      ) => Promise<any>;
+      ) => Promise<any | void>;
     };
-    afterInit?: (state: ApplicationState<TContextData>) => Promise<any>;
+    afterInit?: (state: IApplicationState<TContextData>) => Promise<any | void>;
   }
-): Topic<TInitArgs, TContextData> {
+): ITopic<TInitArgs, TContextData> {
   return {
-    name,
-    isRoot: options.isRoot !== undefined ? options.isRoot : false,
-    init,
+    afterInit: options.afterInit,
     callbacks: options.callbacks,
     hooks: options.hooks || [],
-    afterInit: options.afterInit
+    init: topicInit,
+    isRoot: options.isRoot !== undefined ? options.isRoot : false,
+    name
   };
-}
-
-function incomingMessageIsString(
-  msg: InboundMessage<any>
-): msg is InboundMessage<string> {
-  return typeof msg.value === "string";
 }
 
 export function defPattern<TContextData, TOutboundMessage>(
   name: string,
   patterns: Array<RegExp>,
-  handler: HandlerFunc<
-    TContextData,
-    RegexParseResult | undefined,
-    TOutboundMessage
-  >
-): Hook<TContextData, RegexParseResult | undefined, TOutboundMessage> {
+  handler: HandlerFunc<TContextData, IRegexParseResult, TOutboundMessage>,
+  parseMessage?: (input: any) => string
+): IHook<TContextData, IRegexParseResult, TOutboundMessage> {
   return {
+    handler,
     name,
     parse: async (
-      state: ApplicationState<TContextData>,
-      message: InboundMessage<any>
-    ): Promise<RegexParseResult | undefined> => {
-      if (message && incomingMessageIsString(message)) {
-        const text = message.value;
-        for (let i = 0; i < patterns.length; i++) {
-          const matches = patterns[i].exec(text);
-          if (matches) {
-            return { message, i, matches };
-          }
+      state: IApplicationState<TContextData>,
+      input: any
+    ): Promise<IRegexParseResult | void> => {
+      const text: string = parseMessage ? parseMessage(input) : input;
+      for (let i = 0; i < patterns.length; i++) {
+        const matches = patterns[i].exec(text);
+        if (matches) {
+          return { input, i, matches };
         }
-      } else {
       }
-    },
-    handler
+    }
   };
 }
 
-export function defHook<
-  TContextData,
-  TInboundMessage,
-  TParseResult,
-  TOutboundMessage
->(
+export function defHook<TContextData, TParseResult, TOutboundMessage>(
   name: string,
   parse: ParseFunc<TContextData, TParseResult>,
   handler: HandlerFunc<TContextData, TParseResult, TOutboundMessage>
-): Hook<TContextData, TParseResult, TOutboundMessage> {
+): IHook<TContextData, TParseResult, TOutboundMessage> {
   return {
+    handler,
     name,
-    parse,
-    handler
+    parse
   };
 }
 
-export function activeContext(
-  conversation: Conversation
-): ConversationContext<any> {
-  return conversation.contexts.slice(-1)[0];
+export function activeContext(contextStack: IContextStack): ITopicContext<any> {
+  return contextStack.contexts.slice(-1)[0];
 }
 
 function findTopic(
   name: string,
-  topics: Array<Topic<any, any>>
-): Topic<any, any> {
+  topics: Array<ITopic<any, any>>
+): ITopic<any, any> {
   return topics.filter(t => t.name === name)[0];
 }
 
@@ -219,95 +192,95 @@ export async function enterTopic<
   TCallbackArgs,
   TCallbackResult
 >(
-  state: ApplicationState<TParentContextData>,
-  newTopic: Topic<TNewInitArgs, TNewContextData>,
-  parentTopic: Topic<TParentInitArgs, TParentContextData>,
+  state: IApplicationState<TParentContextData>,
+  newTopic: ITopic<TNewInitArgs, TNewContextData>,
+  parentTopic: ITopic<TParentInitArgs, TParentContextData>,
   args?: TNewInitArgs,
   cb?: HandlerFunc<TParentContextData, TCallbackArgs, TCallbackResult>
 ): Promise<void> {
-  const { context: currentContext, conversation, userData } = state;
+  const { context: currentContext, contextStack, userData } = state;
 
-  const contextOnStack = activeContext(conversation);
+  const contextOnStack = activeContext(contextStack);
 
   if (contextOnStack && state.context !== contextOnStack) {
     throw new Error("You can only enter a new context from the last context.");
   }
 
-  const newContext: ConversationContext<TNewContextData> = {
-    data: await newTopic.init(args, userData),
-    topic: newTopic,
-    parentTopic,
+  const newContext: ITopicContext<TNewContextData> = {
     activeHooks: [],
+    cb,
+    data: await newTopic.init(args, userData),
     disabledHooks: [],
-    cb
+    parentTopic,
+    topic: newTopic
   };
 
   if (newTopic.isRoot) {
-    conversation.contexts = [newContext];
+    contextStack.contexts = [newContext];
   } else {
-    conversation.contexts.push(newContext);
+    contextStack.contexts.push(newContext);
   }
 
   if (newTopic.afterInit) {
-    await newTopic.afterInit({ context: newContext, conversation, userData });
+    await newTopic.afterInit({ context: newContext, contextStack, userData });
   }
 }
 
 export async function exitTopic<TContextData>(
-  state: ApplicationState<TContextData>,
-  args?: Object
+  state: IApplicationState<TContextData>,
+  args?: any
 ): Promise<any> {
-  const { context, conversation, userData } = state;
+  const { context, contextStack, userData } = state;
 
-  if (context !== activeContext(conversation)) {
+  if (context !== activeContext(contextStack)) {
     throw new Error("You can only exit from the current context.");
   }
 
-  const lastContext = conversation.contexts.pop();
+  const lastContext = contextStack.contexts.pop();
 
   if (lastContext && lastContext.cb) {
-    const cb: any = lastContext.cb; //keep flow happy. FIXME
-    const parentContext = activeContext(conversation);
+    const cb = lastContext.cb;
+    const parentContext = activeContext(contextStack);
     return await cb(
-      { context: parentContext, conversation, userData: state.userData },
+      { context: parentContext, contextStack, userData: state.userData },
       args
     );
   }
 }
 
 export async function clearAllTopics<TContextData>(
-  state: ApplicationState<TContextData>
+  state: IApplicationState<TContextData>
 ): Promise<void> {
-  const { context, conversation, userData } = state;
+  const { context, contextStack, userData } = state;
 
-  if (context !== activeContext(conversation)) {
+  if (context !== activeContext(contextStack)) {
     throw new Error("You can only exit from the current context.");
   }
 
-  conversation.contexts = [];
+  contextStack.contexts = [];
 }
 
 export function disableHooksExcept<TContextData>(
-  state: ApplicationState<TContextData>,
+  state: IApplicationState<TContextData>,
   list: Array<string>
 ): void {
   state.context.activeHooks = list;
 }
 
 export function disableHooks<TContextData>(
-  state: ApplicationState<TContextData>,
+  state: IApplicationState<TContextData>,
   list: Array<string>
 ): void {
   state.context.disabledHooks = list;
 }
 
 async function runHook<TContextData, TParseResult, TOutboundMessage>(
-  hook: Hook<TContextData, Object, TOutboundMessage>,
-  state: ApplicationState<TContextData>,
-  message: InboundMessage<any>
+  hook: IHook<TContextData, TParseResult, TOutboundMessage>,
+  state: IApplicationState<TContextData>,
+  input: any
 ): Promise<[boolean, TOutboundMessage] | [false, any]> {
   const { context, userData } = state;
-  const parseResult = await hook.parse(state, message);
+  const parseResult = await hook.parse(state, input);
   if (parseResult !== undefined) {
     const handlerResult = await hook.handler(state, parseResult);
     return [true, handlerResult];
@@ -317,16 +290,16 @@ async function runHook<TContextData, TParseResult, TOutboundMessage>(
 }
 
 async function processMessage<TInboundMessage, TOutboundMessage>(
-  message: InboundMessage<any>,
-  conversation: Conversation,
+  input: any,
+  contextStack: IContextStack,
   userData: UserData,
-  globalContext: ConversationContext<any>,
-  globalTopic: Topic<any, any>,
-  topics: Array<Topic<any, any>>
+  globalContext: ITopicContext<any>,
+  globalTopic: ITopic<any, any>,
+  topics: Array<ITopic<any, any>>
 ): Promise<Array<any>> {
   let handlerResult: any;
 
-  const context = activeContext(conversation);
+  const context = activeContext(contextStack);
   /*
     Check the hooks in the local topic first.
   */
@@ -335,11 +308,11 @@ async function processMessage<TInboundMessage, TOutboundMessage>(
     const currentTopic = findTopic(context.topic.name, topics);
 
     if (currentTopic.hooks) {
-      for (let hook of currentTopic.hooks) {
+      for (const hook of currentTopic.hooks) {
         [handled, handlerResult] = await runHook(
           hook,
-          { context, conversation, userData },
-          message
+          { context, contextStack, userData },
+          input
         );
         if (handled) {
           break;
@@ -355,7 +328,7 @@ async function processMessage<TInboundMessage, TOutboundMessage>(
       if activeHooks is not defined, the hook must not be in disabledHooks
   */
   if (!handled && globalTopic.hooks) {
-    for (let hook of globalTopic.hooks) {
+    for (const hook of globalTopic.hooks) {
       if (
         !context ||
         context.activeHooks.includes(hook.name) ||
@@ -365,8 +338,8 @@ async function processMessage<TInboundMessage, TOutboundMessage>(
       ) {
         [handled, handlerResult] = await runHook(
           hook,
-          { context: context || globalContext, conversation, userData },
-          message
+          { context: context || globalContext, contextStack, userData },
+          input
         );
         if (handled) {
           break;
@@ -382,19 +355,14 @@ async function processMessage<TInboundMessage, TOutboundMessage>(
 }
 
 export function init(
-  allTopics: Array<Topic<any, any>>,
-  options: InitYakOptions = {}
+  allTopics: Array<ITopic<any, any>>,
+  options: IInitYakOptions = {}
 ): TopicsHandler {
-  return async function(
-    rawMessage: string | InboundMessage<any>,
-    conversation = { contexts: [], virgin: true },
+  return async (
+    input: any,
+    contextStack = { contexts: [], virgin: true },
     userData?: UserData
-  ): Promise<YakResponse> {
-    const message =
-      typeof rawMessage === "string"
-        ? { timestamp: Date.now(), value: rawMessage }
-        : rawMessage;
-
+  ): Promise<IResponse> => {
     const globalTopic = findTopic("global", allTopics);
     const topics = allTopics.filter(t => t.name !== "global");
 
@@ -404,12 +372,12 @@ export function init(
       topic: globalTopic
     };
 
-    if (conversation.virgin) {
-      conversation.virgin = false;
+    if (contextStack.virgin) {
+      contextStack.virgin = false;
       const mainTopic = findTopic("main", topics);
       if (mainTopic) {
         await enterTopic(
-          { context: globalContext, conversation, userData },
+          { context: globalContext, contextStack, userData },
           mainTopic,
           globalTopic,
           undefined
@@ -418,8 +386,8 @@ export function init(
     }
 
     const results = await processMessage(
-      message,
-      conversation,
+      input,
+      contextStack,
       userData,
       globalContext,
       globalTopic,
@@ -427,8 +395,8 @@ export function init(
     );
 
     return {
-      conversation,
-      messages: results
+      contextStack,
+      output: results
     };
   };
 }
