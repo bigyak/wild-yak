@@ -61,9 +61,12 @@ export default function getTopics(options?: IGetTopicsOptions) {
     _mainState: {} // FIXME
   };
 
-  const mainTopic = createTopic("main", async (args: any, userData) => {
-    env._enteredMain = true;
-  })({
+  const mainTopic = createTopic<IMessage, IUserData>()(
+    "main",
+    async (args: any, userData) => {
+      env._enteredMain = true;
+    }
+  )({
     afterInit: async state => {
       if (
         env.enterTopic_assertTopContextTest ||
@@ -96,9 +99,12 @@ export default function getTopics(options?: IGetTopicsOptions) {
     isRoot: true
   });
 
-  const nicknameTopic = createTopic("nickname", async (args, userData) => {
-    env._enteredNickname = true;
-  })({
+  const nicknameTopic = createTopic<IMessage, IUserData>()(
+    "nickname",
+    async (args, userData) => {
+      env._enteredNickname = true;
+    }
+  )({
     afterInit: async () => {
       if (env.enterTopic_assertTopContextTest) {
         await enterTopic(env._mainState, defaultTopic, mathTopic);
@@ -111,15 +117,22 @@ export default function getTopics(options?: IGetTopicsOptions) {
     isRoot: true
   });
 
-  const mathTopic = createTopic("math", async (args, userData) => {
-    env._enteredMath = true;
-  })({
+  const mathTopic = createTopic<IMessage, IUserData>()(
+    "math",
+    async (args, userData) => {
+      env._enteredMath = true;
+      return { x: 10 };
+    }
+  )({
     isRoot: true
   });
 
-  const wildcardTopic = createTopic("wildcard", async (args, userData) => {
-    env._enteredWildcard = true;
-  })({
+  const wildcardTopic = createTopic<IMessage, IUserData>()(
+    "wildcard",
+    async (args, userData) => {
+      env._enteredWildcard = true;
+    }
+  )({
     afterInit: async state => {
       if (env._disabled !== undefined) {
         disableConditions(state, env._disabled);
@@ -131,14 +144,17 @@ export default function getTopics(options?: IGetTopicsOptions) {
     isRoot: true
   });
 
-  const mathExpTopic = createTopic("mathexp", async (args, userData) => {
-    env._enteredMathExp = true;
-  })({
+  const mathExpTopic = createTopic<IMessage, IUserData>()(
+    "mathexp",
+    async (args, userData) => {
+      env._enteredMathExp = true;
+    }
+  )({
     isRoot: true
   });
 
   async function onValidateName(
-    state: IApplicationState<any, IUserData>,
+    state: IApplicationState<any, IMessage, IUserData | undefined>,
     args: { success: boolean; name: string }
   ) {
     const { success, name } = args;
@@ -146,9 +162,12 @@ export default function getTopics(options?: IGetTopicsOptions) {
     return `you signed up as ${name}.`;
   }
 
-  const signupTopic = createTopic("signup", async (args, userData: IUserData) => {
-    env._enteredSignup = true;
-  })({
+  const signupTopic = createTopic<IMessage, IUserData>()(
+    "signup",
+    async (args, userData) => {
+      env._enteredSignup = true;
+    }
+  )({
     callbacks: {
       onValidateName
     },
@@ -161,7 +180,7 @@ export default function getTopics(options?: IGetTopicsOptions) {
             state,
             validateTopic,
             signupTopic,
-            undefined,
+            { P: true },
             onValidateName
           );
         }
@@ -170,9 +189,12 @@ export default function getTopics(options?: IGetTopicsOptions) {
     isRoot: true
   });
 
-  const validateTopic = createTopic("validate", async (args, userData) => {
-    env._enteredValidate = true;
-  })({
+  const validateTopic = createTopic<IMessage, IUserData>()(
+    "validate",
+    async (args: { P: boolean } | undefined, userData) => {
+      env._enteredValidate = true;
+    }
+  )({
     conditions: [
       createCondition(
         "validate",
@@ -188,13 +210,16 @@ export default function getTopics(options?: IGetTopicsOptions) {
     ]
   });
 
-  const defaultTopic = createTopic("default", async (args, userData) => {
-    env._enteredDefault = true;
-  })({
+  const defaultTopic = createTopic<IMessage, IUserData>()(
+    "default",
+    async (args, userData) => {
+      env._enteredDefault = true;
+    }
+  )({
     isRoot: false
   });
 
-  const globalTopic = createTopic(
+  const globalTopic = createTopic<IMessage, IUserData>()(
     "global",
     async (args, userData) => undefined
   )({
@@ -208,7 +233,7 @@ export default function getTopics(options?: IGetTopicsOptions) {
       ),
       createCondition(
         "calc",
-        async (state, message: IMessage) => {
+        async (state, message) => {
           const regexpr = /^[0-9\(\)\+\-*/\s]+$/;
           if (message && regexpr.exec(message.text) !== null) {
             try {
