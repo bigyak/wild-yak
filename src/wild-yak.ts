@@ -16,7 +16,7 @@ export interface IInitYakOptions {}
   The caller should pass the same session back when calling again.
 */
 export interface IResponse {
-  contextStack: IContextStack;
+  contexts: IContexts;
   output: any[];
 }
 
@@ -45,10 +45,10 @@ export interface ITopicContext<TContextData> {
 }
 
 /*
-  Conversations contain all the contexts.
+  Contexts contain all the contexts.
 */
-export interface IContextStack {
-  contexts: Array<ITopicContext<any>>;
+export interface IContexts {
+  items: Array<ITopicContext<any>>;
   virgin: boolean;
 }
 
@@ -87,7 +87,7 @@ export interface IHook<TContextData, TParseResult, TOutboundMessage> {
 */
 export interface IApplicationState<TContextData> {
   context: ITopicContext<TContextData>;
-  contextStack: IContextStack;
+  contexts: IContexts;
   userData?: UserData;
 }
 
@@ -105,7 +105,7 @@ export interface IRegexParseResult {
 */
 export type TopicsHandler = (
   input: any,
-  contextStack?: IContextStack,
+  contexts?: IContexts,
   userData?: UserData
 ) => Promise<IResponse>;
 
@@ -173,8 +173,8 @@ export function defHook<TContextData, TParseResult, TOutboundMessage>(
   };
 }
 
-export function activeContext(contextStack: IContextStack): ITopicContext<any> {
-  return contextStack.contexts.slice(-1)[0];
+export function activeContext(contexts: IContexts): ITopicContext<any> {
+  return contexts.items.slice(-1)[0];
 }
 
 function findTopic(
@@ -198,9 +198,9 @@ export async function enterTopic<
   args?: TNewInitArgs,
   cb?: HandlerFunc<TParentContextData, TCallbackArgs, TCallbackResult>
 ): Promise<void> {
-  const { context: currentContext, contextStack, userData } = state;
+  const { context: currentContext, contexts, userData } = state;
 
-  const contextOnStack = activeContext(contextStack);
+  const contextOnStack = activeContext(contexts);
 
   if (contextOnStack && state.context !== contextOnStack) {
     throw new Error("You can only enter a new context from the last context.");
@@ -216,13 +216,13 @@ export async function enterTopic<
   };
 
   if (newTopic.isRoot) {
-    contextStack.contexts = [newContext];
+    contexts.items = [newContext];
   } else {
-    contextStack.contexts.push(newContext);
+    contexts.items.push(newContext);
   }
 
   if (newTopic.afterInit) {
-    await newTopic.afterInit({ context: newContext, contextStack, userData });
+    await newTopic.afterInit({ context: newContext, contexts, userData });
   }
 }
 
@@ -230,19 +230,19 @@ export async function exitTopic<TContextData>(
   state: IApplicationState<TContextData>,
   args?: any
 ): Promise<any> {
-  const { context, contextStack, userData } = state;
+  const { context, contexts, userData } = state;
 
-  if (context !== activeContext(contextStack)) {
+  if (context !== activeContext(contexts)) {
     throw new Error("You can only exit from the current context.");
   }
 
-  const lastContext = contextStack.contexts.pop();
+  const lastContext = contexts.items.pop();
 
   if (lastContext && lastContext.cb) {
     const cb = lastContext.cb;
-    const parentContext = activeContext(contextStack);
+    const parentContext = activeContext(contexts);
     return await cb(
-      { context: parentContext, contextStack, userData: state.userData },
+      { context: parentContext, contexts, userData: state.userData },
       args
     );
   }
@@ -251,13 +251,13 @@ export async function exitTopic<TContextData>(
 export async function clearAllTopics<TContextData>(
   state: IApplicationState<TContextData>
 ): Promise<void> {
-  const { context, contextStack, userData } = state;
+  const { context, contexts, userData } = state;
 
-  if (context !== activeContext(contextStack)) {
+  if (context !== activeContext(contexts)) {
     throw new Error("You can only exit from the current context.");
   }
 
-  contextStack.contexts = [];
+  contexts.items = [];
 }
 
 export function disableHooksExcept<TContextData>(
@@ -291,7 +291,7 @@ async function runHook<TContextData, TParseResult, TOutboundMessage>(
 
 async function processMessage<TInboundMessage, TOutboundMessage>(
   input: any,
-  contextStack: IContextStack,
+  contexts: IContexts,
   userData: UserData,
   globalContext: ITopicContext<any>,
   globalTopic: ITopic<any, any>,
@@ -299,7 +299,7 @@ async function processMessage<TInboundMessage, TOutboundMessage>(
 ): Promise<Array<any>> {
   let handlerResult: any;
 
-  const context = activeContext(contextStack);
+  const context = activeContext(contexts);
   /*
     Check the hooks in the local topic first.
   */
@@ -311,7 +311,7 @@ async function processMessage<TInboundMessage, TOutboundMessage>(
       for (const hook of currentTopic.hooks) {
         [handled, handlerResult] = await runHook(
           hook,
-          { context, contextStack, userData },
+          { context, contexts, userData },
           input
         );
         if (handled) {
@@ -338,7 +338,7 @@ async function processMessage<TInboundMessage, TOutboundMessage>(
       ) {
         [handled, handlerResult] = await runHook(
           hook,
-          { context: context || globalContext, contextStack, userData },
+          { context: context || globalContext, contexts, userData },
           input
         );
         if (handled) {
@@ -360,7 +360,7 @@ export function init(
 ): TopicsHandler {
   return async (
     input: any,
-    contextStack = { contexts: [], virgin: true },
+    contexts = { items: [], virgin: true },
     userData?: UserData
   ): Promise<IResponse> => {
     const globalTopic = findTopic("global", allTopics);
@@ -372,12 +372,12 @@ export function init(
       topic: globalTopic
     };
 
-    if (contextStack.virgin) {
-      contextStack.virgin = false;
+    if (contexts.virgin) {
+      contexts.virgin = false;
       const mainTopic = findTopic("main", topics);
       if (mainTopic) {
         await enterTopic(
-          { context: globalContext, contextStack, userData },
+          { context: globalContext, contexts, userData },
           mainTopic,
           globalTopic,
           undefined
@@ -387,7 +387,7 @@ export function init(
 
     const results = await processMessage(
       input,
-      contextStack,
+      contexts,
       userData,
       globalContext,
       globalTopic,
@@ -395,7 +395,7 @@ export function init(
     );
 
     return {
-      contextStack,
+      contexts,
       output: results
     };
   };
