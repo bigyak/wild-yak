@@ -4,6 +4,7 @@
   "author": "Yak<yak@agilehead.com>",
   "main": "dist/wild-yak",
   "scripts": {
+    "build": "./build.sh",
     "test": "./build.sh && mocha dist/test/test.js"
   },
   "license": "MIT",

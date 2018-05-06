@@ -1,15 +1,14 @@
 import {
   clearAllTopics,
-  defHook,
-  defPattern,
-  defTopic,
-  disableHooks,
-  disableHooksExcept,
+  createCondition,
+  createTopic,
+  disableConditions,
+  disableConditionsExcept,
   enterTopic,
   exitTopic,
   IApplicationState,
   ITopic,
-  UserData
+  regexParse
 } from "../wild-yak";
 
 export interface IGetTopicsOptions {
@@ -19,6 +18,10 @@ export interface IGetTopicsOptions {
 export interface IMessage {
   timestamp?: number;
   text: string;
+}
+
+export interface IUserData {
+  x: number;
 }
 
 export interface IEnvType {
@@ -39,6 +42,10 @@ export interface IEnvType {
   exitTopic_assertTopContextTest?: boolean;
 }
 
+function regex<TContextData, TUserData>(patterns: Array<RegExp>) {
+  return regexParse<TContextData, IMessage, TUserData>(patterns, x => x.text);
+}
+
 export default function getTopics(options?: IGetTopicsOptions) {
   const env: IEnvType = {
     _clearAllTopics: false,
@@ -54,104 +61,84 @@ export default function getTopics(options?: IGetTopicsOptions) {
     _mainState: {} // FIXME
   };
 
-  const mainTopic = defTopic(
-    "main",
-    async (args: any, userData: UserData) => {
-      env._enteredMain = true;
+  const mainTopic = createTopic("main", async (args: any, userData) => {
+    env._enteredMain = true;
+  })({
+    afterInit: async state => {
+      if (
+        env.enterTopic_assertTopContextTest ||
+        env.exitTopic_assertTopContextTest
+      ) {
+        env._mainState = state;
+        await enterTopic(state, nicknameTopic, mainTopic);
+      }
     },
-    {
-      afterInit: async state => {
-        if (
-          env.enterTopic_assertTopContextTest ||
-          env.exitTopic_assertTopContextTest
-        ) {
-          env._mainState = state;
-          await enterTopic(state, nicknameTopic, mainTopic);
+    conditions: [
+      createCondition(
+        "respond-to-hello",
+        regex([/^Hello (.*)$/]),
+        async (state, { matches }) => {
+          return "hey, what's up!";
         }
-      },
-      hooks: [
-        defPattern(
-          "respond-to-hello",
-          [/^Hello (.*)$/],
-          async (state, { matches }) => {
-            return "hey, what's up!";
+      ),
+      createCondition(
+        "boomshanker",
+        async (state, message) => {
+          if (message && message.text === "Boomshanker") {
+            return "zomg!";
           }
-        ),
-        defHook(
-          "boomshanker",
-          async (state, message: IMessage) => {
-            if (message && message.text === "Boomshanker") {
-              return "zomg!";
-            }
-          },
-          async (state, zomg) => {
-            return `omg ${zomg}`;
-          }
-        )
-      ],
-      isRoot: true
-    }
-  );
-
-  const nicknameTopic = defTopic(
-    "nickname",
-    async (args, userData) => {
-      env._enteredNickname = true;
-    },
-    {
-      afterInit: async () => {
-        if (env.enterTopic_assertTopContextTest) {
-          await enterTopic(env._mainState, defaultTopic, mathTopic);
+        },
+        async (state, zomg) => {
+          return `omg ${zomg}`;
         }
+      )
+    ],
+    isRoot: true
+  });
 
-        if (env.exitTopic_assertTopContextTest) {
-          await exitTopic(env._mainState);
-        }
-      },
-      isRoot: true
-    }
-  );
+  const nicknameTopic = createTopic("nickname", async (args, userData) => {
+    env._enteredNickname = true;
+  })({
+    afterInit: async () => {
+      if (env.enterTopic_assertTopContextTest) {
+        await enterTopic(env._mainState, defaultTopic, mathTopic);
+      }
 
-  const mathTopic = defTopic(
-    "math",
-    async (args, userData) => {
-      env._enteredMath = true;
+      if (env.exitTopic_assertTopContextTest) {
+        await exitTopic(env._mainState);
+      }
     },
-    {
-      isRoot: true
-    }
-  );
+    isRoot: true
+  });
 
-  const wildcardTopic = defTopic(
-    "wildcard",
-    async (args, userData) => {
-      env._enteredWildcard = true;
-    },
-    {
-      afterInit: async state => {
-        if (env._disabled !== undefined) {
-          disableHooks(state, env._disabled);
-        }
-        if (env._enabled !== undefined) {
-          disableHooksExcept(state, env._enabled);
-        }
-      },
-      isRoot: true
-    }
-  );
+  const mathTopic = createTopic("math", async (args, userData) => {
+    env._enteredMath = true;
+  })({
+    isRoot: true
+  });
 
-  const mathExpTopic = defTopic(
-    "mathexp",
-    async (args, userData) => {
-      env._enteredMathExp = true;
+  const wildcardTopic = createTopic("wildcard", async (args, userData) => {
+    env._enteredWildcard = true;
+  })({
+    afterInit: async state => {
+      if (env._disabled !== undefined) {
+        disableConditions(state, env._disabled);
+      }
+      if (env._enabled !== undefined) {
+        disableConditionsExcept(state, env._enabled);
+      }
     },
-    {
-      isRoot: true
-    }
-  );
+    isRoot: true
+  });
+
+  const mathExpTopic = createTopic("mathexp", async (args, userData) => {
+    env._enteredMathExp = true;
+  })({
+    isRoot: true
+  });
 
   async function onValidateName(
-    state: IApplicationState<any>,
+    state: IApplicationState<any, IUserData>,
     args: { success: boolean; name: string }
   ) {
     const { success, name } = args;
@@ -159,17 +146,17 @@ export default function getTopics(options?: IGetTopicsOptions) {
     return `you signed up as ${name}.`;
   }
 
-  const signupTopic = defTopic(
-    "signup",
-    async (args, userData) => {
-      env._enteredSignup = true;
+  const signupTopic = createTopic("signup", async (args, userData: IUserData) => {
+    env._enteredSignup = true;
+  })({
+    callbacks: {
+      onValidateName
     },
-    {
-      callbacks: {
-        onValidateName
-      },
-      hooks: [
-        defPattern("validate", [/^name$/], async (state, { matches }) => {
+    conditions: [
+      createCondition(
+        "validate",
+        regex([/^name$/]),
+        async (state, { matches }) => {
           await enterTopic(
             state,
             validateTopic,
@@ -177,98 +164,97 @@ export default function getTopics(options?: IGetTopicsOptions) {
             undefined,
             onValidateName
           );
-        })
-      ],
-      isRoot: true
-    }
-  );
+        }
+      )
+    ],
+    isRoot: true
+  });
 
-  const validateTopic = defTopic(
-    "validate",
-    async (args, userData) => {
-      env._enteredValidate = true;
-    },
-    {
-      hooks: [
-        defPattern("validate", [/^name (.*)$/], async (state, { matches }) => {
+  const validateTopic = createTopic("validate", async (args, userData) => {
+    env._enteredValidate = true;
+  })({
+    conditions: [
+      createCondition(
+        "validate",
+        regex([/^name (.*)$/]),
+        async (state, { matches }) => {
           if (!env._clearAllTopics) {
             await exitTopic(state, { success: true });
           } else {
             await clearAllTopics(state);
           }
-        })
-      ]
-    }
-  );
+        }
+      )
+    ]
+  });
 
-  const defaultTopic = defTopic(
-    "default",
-    async (args, userData) => {
-      env._enteredDefault = true;
-    },
-    {
-      isRoot: false
-    }
-  );
+  const defaultTopic = createTopic("default", async (args, userData) => {
+    env._enteredDefault = true;
+  })({
+    isRoot: false
+  });
 
-  const globalTopic = defTopic(
+  const globalTopic = createTopic(
     "global",
-    async (args, userData: UserData) => undefined,
-    {
-      hooks: [
-        defPattern(
-          "nickname",
-          [/^nick ([A-z]\w*)$/, /^nickname ([A-z]\w*)$/],
-          async (state, { matches }) => {
-            await enterTopic(state, nicknameTopic, globalTopic, matches[1]);
-          }
-        ),
-        defHook(
-          "calc",
-          async (state, message: IMessage) => {
-            const regex = /^[0-9\(\)\+\-*/\s]+$/;
-            if (message && regex.exec(message.text) !== null) {
-              try {
-                return eval(message.text);
-              } catch (e) {
-                console.log(e);
-              }
+    async (args, userData) => undefined
+  )({
+    conditions: [
+      createCondition(
+        "nickname",
+        regex([/^nick ([A-z]\w*)$/, /^nickname ([A-z]\w*)$/]),
+        async (state, { matches }) => {
+          await enterTopic(state, nicknameTopic, globalTopic, matches[1]);
+        }
+      ),
+      createCondition(
+        "calc",
+        async (state, message: IMessage) => {
+          const regexpr = /^[0-9\(\)\+\-*/\s]+$/;
+          if (message && regexpr.exec(message.text) !== null) {
+            try {
+              return eval(message.text);
+            } catch (e) {
+              console.log(e);
             }
-          },
-          async (state, result) => {
-            await enterTopic(state, mathTopic, globalTopic, result);
           }
-        ),
-        defPattern(
-          "wildcard",
-          [/^wildcard ([A-z].*)$/, /^wild ([A-z].*)$/],
-          async (state, { matches }) => {
-            await enterTopic(state, wildcardTopic, globalTopic, matches[1]);
-          }
-        ),
-        defPattern(
-          "mathexp",
-          [/^5 \+ 10$/, /^100\/4$/],
-          async (state, { matches }) => {
-            await enterTopic(state, mathExpTopic, globalTopic, matches[0]);
-          }
-        ),
-        defPattern("signup", [/^signup (.*)$/], async (state, { matches }) => {
+        },
+        async (state, result) => {
+          await enterTopic(state, mathTopic, globalTopic, result);
+        }
+      ),
+      createCondition(
+        "wildcard",
+        regex([/^wildcard ([A-z].*)$/, /^wild ([A-z].*)$/]),
+        async (state, { matches }) => {
+          await enterTopic(state, wildcardTopic, globalTopic, matches[1]);
+        }
+      ),
+      createCondition(
+        "mathexp",
+        regex([/^5 \+ 10$/, /^100\/4$/]),
+        async (state, { matches }) => {
+          await enterTopic(state, mathExpTopic, globalTopic, matches[0]);
+        }
+      ),
+      createCondition(
+        "signup",
+        regex([/^signup (.*)$/]),
+        async (state, { matches }) => {
           await enterTopic(state, signupTopic, globalTopic, matches[1]);
-        }),
-        defHook(
-          "default",
-          async (state, message: IMessage) => {
-            return message;
-          },
-          async (state, message: IMessage) => {
-            await enterTopic(state, defaultTopic, globalTopic, message);
-          }
-        )
-      ],
-      isRoot: true
-    }
-  );
+        }
+      ),
+      createCondition(
+        "default",
+        async (state, message: IMessage) => {
+          return message;
+        },
+        async (state, message: IMessage) => {
+          await enterTopic(state, defaultTopic, globalTopic, message);
+        }
+      )
+    ],
+    isRoot: true
+  });
 
   const allTopics = [
     globalTopic,

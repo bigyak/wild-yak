@@ -1,8 +1,8 @@
 import "mocha";
 import "should";
 import {
-  disableHooks,
-  disableHooksExcept,
+  disableConditions,
+  disableConditionsExcept,
   enterTopic,
   exitTopic,
   init
@@ -52,10 +52,10 @@ describe("Wild yak", () => {
     const result = await handler(message);
 
     env._enteredMain.should.be.true();
-    result.output[0].text.should.equal("hey, what's up!");
+    result.output[0].should.equal("hey, what's up!");
   });
 
-  it("Returns a message from a hook", async () => {
+  it("Returns a message from a condition", async () => {
     const { env, topics } = getTopics({ includeMain: true });
     const message = {
       text: "Boomshanker"
@@ -64,7 +64,7 @@ describe("Wild yak", () => {
     const result = await handler(message);
 
     env._enteredMain.should.be.true();
-    result.output[0].text.should.equal("omg zomg!");
+    result.output[0].should.equal("omg zomg!");
   });
 
   it("Runs a topic when pattern matches", async () => {
@@ -78,7 +78,7 @@ describe("Wild yak", () => {
     env._enteredNickname.should.be.true();
   });
 
-  it("Runs a custom hook (non-regex)", async () => {
+  it("Runs a custom condition (non-regex)", async () => {
     const { env, topics } = getTopics();
     const message = {
       text: "5 + 10"
@@ -89,7 +89,7 @@ describe("Wild yak", () => {
     env._enteredMath.should.be.true();
   });
 
-  it("Run the default hook if nothing matches", async () => {
+  it("Run the default condition if nothing matches", async () => {
     const { env, topics } = getTopics();
     const message = {
       text: "somethingweird"
@@ -100,7 +100,7 @@ describe("Wild yak", () => {
     env._enteredDefault.should.be.true();
   });
 
-  it("Disables hooks", async () => {
+  it("Disables conditions", async () => {
     const { env, topics } = getTopics();
     const message = {
       text: "wildcard going to be alone"
@@ -111,7 +111,7 @@ describe("Wild yak", () => {
     env._enteredWildcard.should.be.true();
   });
 
-  it("Runs a hook for each message", async () => {
+  it("Runs a condition for each message", async () => {
     const { env, topics } = getTopics();
     const message = {
       text: "wildcard going to be alone"
@@ -121,19 +121,19 @@ describe("Wild yak", () => {
     const result = await handler(message);
 
     env._enteredWildcard.should.be.true();
-
+    
     const message2 = {
       text: "nickname yakyak"
     };
     await handler(message2, result.contexts);
-
+    
     env._enteredDefault.should.be.true();
   });
 
-  it("Disables hooks except specified hooks", async () => {
+  it("Disables conditions except specified conditions", async () => {
     const { env, topics } = getTopics();
     const message = {
-      text: "wildcard disableHooksExcept mathexp"
+      text: "wildcard disableConditionsExcept mathexp"
     };
     const handler = await init(topics);
     env._enabled = ["mathexp"];
