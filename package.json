@@ -1,6 +1,6 @@
 {
   "name": "wild-yak",
-  "version": "0.0.16",
+  "version": "0.0.17",
   "author": "Yak<yak@agilehead.com>",
   "main": "dist/wild-yak",
   "scripts": {
@@ -14,7 +14,6 @@
   "devDependencies": {
     "@types/mocha": "^5.2.0",
     "@types/should": "^13.0.0",
-    "left-pad": "^1.2.0",
     "mocha": "5.1.1",
     "should": "^13.2.1"
   }
