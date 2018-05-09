@@ -15,13 +15,20 @@ export interface IResponse<TMessage, TUserData> {
   output: any[];
 }
 
+export interface ICallbacks<TMessage, TUserData> {
+  [key: string]: (
+    state: IApplicationState<any, TMessage, TUserData>,
+    args: any
+  ) => any;
+}
+
 /*
   Definition of a Topic.
 */
 export interface ITopic<TInitArgs, TContextData, TMessage, TUserData>
   extends ITopicBase<TInitArgs, TContextData, TUserData> {
   isRoot: boolean;
-  callbacks: { [key: string]: (state: any, params: any) => Promise<any> };
+  callbacks: Maybe<ICallbacks<TMessage, TUserData>>;
   conditions: Array<ICondition<TContextData, any, any, TMessage, TUserData>>;
   afterInit?: (
     state: IApplicationState<TContextData, TMessage, TUserData>
@@ -97,12 +104,7 @@ export interface ICondition<
   TUserData
 > {
   name: string;
-  predicate: Predicate<
-    TContextData,
-    TParseResult,
-    TMessage,
-    TUserData
-  >;
+  predicate: Predicate<TContextData, TParseResult, TMessage, TUserData>;
   handler: HandlerFunc<
     TContextData,
     TParseResult,
@@ -139,14 +141,14 @@ export interface IRegexParseResult<TInput> {
 export type TopicsHandler<TMessage, TUserData> = (
   input: TMessage,
   serializedContexts?: ISerializableContexts,
-  userData?: TUserData
+  userData?: Maybe<TUserData>
 ) => Promise<IResponse<TMessage, TUserData>>;
 
 export interface ITopicBase<TInitArgs, TContextData, TUserData> {
   name: string;
   init: (
-    args?: TInitArgs,
-    userData?: TUserData
+    args: TInitArgs,
+    userData: Maybe<TUserData>
   ) => Promise<TContextData | void>;
 }
 
@@ -154,8 +156,8 @@ export function createTopic<TMessage, TUserData>() {
   return <TInitArgs, TContextData>(
     name: string,
     topicInit: (
-      args?: TInitArgs,
-      userData?: TUserData
+      args: TInitArgs,
+      userData: Maybe<TUserData>
     ) => Promise<TContextData | void>
   ) => {
     const topic = {
@@ -172,22 +174,15 @@ function completeTopic<TInitArgs, TContextData, TMessage, TUserData>(
 ) {
   return (options: {
     isRoot?: boolean;
-    conditions?: Array<
-      ICondition<TContextData, any, any, TMessage, TUserData>
-    >;
-    callbacks?: {
-      [key: string]: (
-        state: IApplicationState<TContextData, TMessage, TUserData>,
-        params: any
-      ) => Promise<any | void>;
-    };
+    conditions?: Array<ICondition<TContextData, any, any, TMessage, TUserData>>;
+    callbacks?: ICallbacks<TMessage, TUserData>;
     afterInit?: (
       state: IApplicationState<TContextData, TMessage, TUserData>
     ) => Promise<any | void>;
   }): ITopic<TInitArgs, TContextData, TMessage, TUserData> => {
     return {
       afterInit: options.afterInit,
-      callbacks: options.callbacks || {},
+      callbacks: options.callbacks,
       conditions: options.conditions || [],
       isRoot: typeof options.isRoot !== "undefined" ? options.isRoot : false,
       ...topic
@@ -221,12 +216,7 @@ export function createCondition<
   TUserData
 >(
   name: string,
-  predicate: Predicate<
-    TContextData,
-    TParseResult,
-    TMessage,
-    TUserData
-  >,
+  predicate: Predicate<TContextData, TParseResult, TMessage, TUserData>,
   handler: HandlerFunc<
     TContextData,
     TParseResult,
@@ -262,30 +252,29 @@ function findTopic<TMessage, TUserData>(
 }
 
 export async function enterTopic<
-  TParentInitArgs,
-  TParentContextData,
   TNewInitArgs,
   TNewContextData,
+  TParentInitArgs,
+  TParentContextData,
   TCallbackArgs,
   TCallbackResult,
   TMessage,
-  TUserData
->(
-  state: IApplicationState<TParentContextData, TMessage, TUserData>,
-  newTopic: ITopic<
-    TNewInitArgs,
-    TNewContextData,
-    TMessage,
-    TUserData
-  >,
-  parentTopic: ITopic<
+  TUserData,
+  TTopic extends ITopic<TNewInitArgs, TNewContextData, TMessage, TUserData>,
+  TParentTopic extends ITopic<
     TParentInitArgs,
     TParentContextData,
     TMessage,
     TUserData
-  >,
-  args?: TNewInitArgs,
-  cb?: (state: IApplicationState<any, TMessage, TUserData>, args: any) => any
+  >
+>(
+  state: IApplicationState<TParentContextData, TMessage, TUserData>,
+  newTopic: TTopic,
+  parentTopic: TParentTopic,
+  args: TNewInitArgs,
+  cbSelector?: (
+    callbacks: ICallbacks<TMessage, TUserData>
+  ) => (state: IApplicationState<any, TMessage, TUserData>, args: any) => any
 ): Promise<void> {
   const { context: currentContext, contexts, userData } = state;
 
@@ -295,13 +284,12 @@ export async function enterTopic<
     throw new Error("You can only enter a new context from the last context.");
   }
 
-  const newContext: ITopicContext<
-    TNewContextData,
-    TMessage,
-    TUserData
-  > = {
+  const newContext: ITopicContext<TNewContextData, TMessage, TUserData> = {
     activeConditions: [],
-    cb,
+    cb:
+      cbSelector && parentTopic.callbacks
+        ? cbSelector(parentTopic.callbacks)
+        : undefined,
     data: await newTopic.init(args, userData),
     disabledConditions: [],
     parentTopic,
@@ -321,7 +309,7 @@ export async function enterTopic<
 
 export async function exitTopic<TContextData, TMessage, TUserData>(
   state: IApplicationState<TContextData, TMessage, TUserData>,
-  args?: any
+  args: any
 ): Promise<any> {
   const { context, contexts, userData } = state;
 
@@ -501,7 +489,10 @@ export function init<TMessage, TUserData>(
           : undefined;
         return {
           activeConditions: c.activeConditions,
-          cb: c.cb && parentTopic ? parentTopic.callbacks[c.cb] : undefined,
+          cb:
+            c.cb && parentTopic && parentTopic.callbacks
+              ? parentTopic.callbacks[c.cb]
+              : undefined,
           data: c.data,
           disabledConditions: c.disabledConditions,
           parentTopic,
@@ -515,19 +506,15 @@ export function init<TMessage, TUserData>(
 
   const topics = allTopics.filter(t => t.name !== "global");
 
-  const globalTopic: ITopic<
-    any,
-    any,
-    TMessage,
-    TUserData
-  > = findTopic("global", allTopics);
+  const globalTopic: ITopic<any, any, TMessage, TUserData> = findTopic(
+    "global",
+    allTopics
+  );
 
-  const mainTopic: ITopic<
-    any,
-    any,
-    TMessage,
-    TUserData
-  > = findTopic("main", topics);
+  const mainTopic: ITopic<any, any, TMessage, TUserData> = findTopic(
+    "main",
+    topics
+  );
 
   const globalContext: ITopicContext<any, TMessage, TUserData> = {
     activeConditions: [],
