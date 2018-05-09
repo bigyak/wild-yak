@@ -1,4 +1,4 @@
-import { IEvalState, IHandlerResult, ITopic } from "..";
+import { IEvalState, IHandlerResult, ITopic, TopicBase } from "..";
 
 export interface IMessage {
   timestamp?: number;
@@ -14,7 +14,8 @@ export interface IHost {
   getUserDirectory(username: string): string;
 }
 
-export class DefaultTopic implements ITopic<IMessage, IUserData, IHost> {
+export class DefaultTopic extends TopicBase<IMessage, IUserData, IHost>
+  implements ITopic<IMessage, IUserData, IHost> {
   async handle(
     state: IEvalState<IMessage, IUserData, IHost>,
     message: IMessage,
@@ -31,38 +32,56 @@ export class DefaultTopic implements ITopic<IMessage, IUserData, IHost> {
   }
 }
 
-export class TopicBase implements ITopic<IMessage, IUserData, IHost> {
-  handle: (
+export class RootTopic extends TopicBase<IMessage, IUserData, IHost>
+  implements ITopic<IMessage, IUserData, IHost> {
+  async handle(
     state: IEvalState<IMessage, IUserData, IHost>,
     message: IMessage,
     userData: IUserData,
     host: IHost
-  ) => Promise<IHandlerResult>;
-
-  isTopLevel: () => boolean;
-
-  constructor(
-    handle: (
-      state: IEvalState<IMessage, IUserData, IHost>,
-      message: IMessage,
-      userData: IUserData,
-      host: IHost
-    ) => Promise<IHandlerResult>,
-    isTopLevel: () => boolean
-  ) {
-    this.handle = handle;
-    this.isTopLevel = isTopLevel;
+  ): Promise<IHandlerResult> {
+    if (message.text === "do math") {
+      this.enterTopic(state, new MathTopic());
+      return { handled: true, result: "You can type a math expression" };
+    } else {
+      return {
+        handled: true,
+        result:
+          "Life is like riding a bicycle. To keep your balance you must keep moving."
+      };
+    }
   }
 }
 
-const M = new TopicBase(
-  async (a, b, c, d) => ({
-    handled: false
-  }),
-  () => false
-);
+export class MathTopic extends TopicBase<IMessage, IUserData, IHost>
+  implements ITopic<IMessage, IUserData, IHost> {
+  async handle(
+    state: IEvalState<IMessage, IUserData, IHost>,
+    message: IMessage,
+    userData: IUserData,
+    host: IHost
+  ): Promise<IHandlerResult> {
+    if (message.text === "do advanced math") {
+      this.enterTopic(state, new AdvancedMathTopic());
+      return {
+        handled: true,
+        result: "You can do advanced math now."
+      };
+    } else {
+      return {
+        handled: true,
+        result: eval(message.text)
+      };
+    }
+  }
 
-export class RootTopic implements ITopic<IMessage, IUserData, IHost> {
+  isTopLevel() {
+    return true;
+  }
+}
+
+export class AdvancedMathTopic extends TopicBase<IMessage, IUserData, IHost>
+  implements ITopic<IMessage, IUserData, IHost> {
   async handle(
     state: IEvalState<IMessage, IUserData, IHost>,
     message: IMessage,
@@ -71,25 +90,7 @@ export class RootTopic implements ITopic<IMessage, IUserData, IHost> {
   ): Promise<IHandlerResult> {
     return {
       handled: true,
-      result:
-        "Life is like riding a bicycle. To keep your balance you must keep moving."
-    };
-  }
-
-  isTopLevel() {
-    return true;
-  }
-}
-
-export class MathTopic implements ITopic<IMessage, IUserData, IHost> {
-  async handle(
-    state: IEvalState<IMessage, IUserData, IHost>,
-    message: IMessage,
-    userData: IUserData,
-    host: IHost
-  ): Promise<IHandlerResult> {
-    return {
-      handled: false
+      result: eval(message.text)
     };
   }
 

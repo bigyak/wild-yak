@@ -28,22 +28,18 @@ function getHost(): IHost {
   };
 }
 
+function getHandler() {
+  return init<IMessage, IUserData, IHost>(RootTopic, DefaultTopic, otherTopics);
+}
+
 describe("Wild yak", () => {
   it("init() returns a handler", async () => {
-    const handler = await init<IMessage, IUserData, IHost>(
-      RootTopic,
-      DefaultTopic,
-      otherTopics
-    );
+    const handler = getHandler();
     handler.should.be.an.instanceOf(Function);
   });
 
   it("Enters the default topic while starting", async () => {
-    const handler = await init<IMessage, IUserData, IHost>(
-      RootTopic,
-      DefaultTopic,
-      otherTopics
-    );
+    const handler = getHandler();
 
     const message = {
       text: "hello world"
@@ -55,11 +51,7 @@ describe("Wild yak", () => {
   });
 
   it("If not handled otherwise, should be handled by root topic", async () => {
-    const handler = await init<IMessage, IUserData, IHost>(
-      RootTopic,
-      DefaultTopic,
-      otherTopics
-    );
+    const handler = getHandler();
 
     const message = {
       text: "something something!"
@@ -70,6 +62,86 @@ describe("Wild yak", () => {
     output.result.should.equal(
       "Life is like riding a bicycle. To keep your balance you must keep moving."
     );
+  });
+
+  it("Enters a new topic from the root topic", async () => {
+    const handler = getHandler();
+
+    const message1 = {
+      text: "do math"
+    };
+
+    const output1 = await handler(
+      message1,
+      undefined,
+      getUserData(),
+      getHost()
+    );
+    output1.result.should.equal("You can type a math expression");
+
+    const message2 = {
+      text: "2 + 3"
+    };
+
+    const output2 = await handler(
+      message2,
+      output1.state,
+      getUserData(),
+      getHost()
+    );
+    output2.result.should.equal(5);
+
+    const message3 = {
+      text: "20 + 30"
+    };
+
+    const output3 = await handler(
+      message3,
+      output1.state,
+      getUserData(),
+      getHost()
+    );
+    output3.result.should.equal(50);
+  });
+
+  it("Enters a new topic from the root topic", async () => {
+    const handler = getHandler();
+
+    const message1 = {
+      text: "do math"
+    };
+
+    const output1 = await handler(
+      message1,
+      undefined,
+      getUserData(),
+      getHost()
+    );
+    output1.result.should.equal("You can type a math expression");
+
+    const message2 = {
+      text: "2 + 3"
+    };
+
+    const output2 = await handler(
+      message2,
+      output1.state,
+      getUserData(),
+      getHost()
+    );
+    output2.result.should.equal(5);
+
+    const message3 = {
+      text: "20 + 30"
+    };
+
+    const output3 = await handler(
+      message3,
+      output1.state,
+      getUserData(),
+      getHost()
+    );
+    output3.result.should.equal(50);
   });
 
   // it("Returns a message from a pattern", async () => {

@@ -33,17 +33,41 @@ export interface ITopic<TMessage, TUserData, THost> {
     userData: TUserData,
     host: THost
   ): Promise<IHandlerResult>;
-  isTopLevel(): boolean;
+  isTopLevel?(): boolean;
 }
 
-export abstract class TopicBase<TMessage, TUserData, THost>
-  implements ITopic<TMessage, TUserData, THost> {
-    enterTopic(evalState: IEvalState<TMessage, TUserData, THost>,
-      topic: ITopic<TMessage, TUserData, THost>) {
-        
-      }
-
+export abstract class TopicBase<TMessage, TUserData, THost> {
+  enterTopic(
+    evalState: IEvalState<TMessage, TUserData, THost>,
+    topic: ITopic<TMessage, TUserData, THost>
+  ) {
+    const currentTopic = getActiveTopic(evalState);
+    if (
+      evalState.rootTopic === (this as any) ||
+      currentTopic === (this as any)
+    ) {
+      evalState.topics.push(topic);
+    } else {
+      throw new Error(
+        `The caller is not the currently active topic. This is an error in code.`
+      );
+    }
   }
+
+  exitTopic(evalState: IEvalState<TMessage, TUserData, THost>) {
+    const currentTopic = getActiveTopic(evalState);
+    if (
+      evalState.rootTopic === (this as any) ||
+      currentTopic === (this as any)
+    ) {
+      evalState.topics.pop();
+    } else {
+      throw new Error(
+        `The caller is not the currently active topic. This is an error in code.`
+      );
+    }
+  }
+}
 
 interface ITopicMap<TMessage, TUserData, THost> {
   [key: string]: ITopicCtor<ITopic<TMessage, TUserData, THost>>;
@@ -80,7 +104,10 @@ function toSerializable<TMessage, TUserData, THost>(
   state: IEvalState<TMessage, TUserData, THost>
 ) {
   return {
-    rootTopic: state.rootTopic,
+    rootTopic: {
+      ctor: state.rootTopic.constructor.name,
+      props: { ...state.rootTopic }
+    },
     topics: state.topics.map(c => ({
       ctor: c.constructor.name,
       props: { ...c }
@@ -118,18 +145,18 @@ function recreateEvalState<TMessage, TUserData, THost>(
   };
 }
 
-export function enterTopic<TMessage, TUserData, THost>(
+function enterTopic<TMessage, TUserData, THost>(
   evalState: IEvalState<TMessage, TUserData, THost>,
   topic: ITopic<TMessage, TUserData, THost>
 ) {
-  if (topic.isTopLevel()) {
+  if (topic.isTopLevel && topic.isTopLevel()) {
     evalState.topics = [topic];
   } else {
     evalState.topics.push(topic);
   }
 }
 
-export function exitTopic<TMessage, TUserData, THost>(
+function exitTopic<TMessage, TUserData, THost>(
   evalState: IEvalState<TMessage, TUserData, THost>,
   current: ITopic<TMessage, TUserData, THost>
 ) {
@@ -173,8 +200,8 @@ export function init<TMessage, TUserData, THost>(
     );
 
     if (evalState.virgin) {
-      evalState.topics = [new defaultTopicCtor()];
       evalState.virgin = false;
+      enterTopic(evalState, new defaultTopicCtor());
     }
 
     const { handled, result } = await processMessage(
@@ -182,7 +209,7 @@ export function init<TMessage, TUserData, THost>(
       message,
       userData,
       host,
-      rootTopic
+      evalState.rootTopic
     );
 
     return {
