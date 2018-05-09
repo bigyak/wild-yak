@@ -9,7 +9,7 @@ export interface IInitOptions {}
   The caller should pass the same session back when calling again.
 */
 export interface IResponse<TMessage, TUserData> {
-  contexts: IContexts<TMessage, TUserData>;
+  contexts: ISerializableContexts;
   output: any[];
 }
 
@@ -38,11 +38,25 @@ export interface ITopicContext<TContextData, TMessage, TUserData> {
   cb?: Function;
 }
 
+export interface ISerializableTopicContext<TContextData> {
+  data?: TContextData | void;
+  activeConditions: Array<string>;
+  disabledConditions: Array<string>;
+  topic: string;
+  parentTopic?: string;
+  cb?: string;
+}
+
 /*
   Contexts contain all the contexts.
 */
 export interface IContexts<TMessage, TUserData> {
   items: Array<ITopicContext<any, TMessage, TUserData>>;
+  virgin: boolean;
+}
+
+export interface ISerializableContexts {
+  items: Array<ISerializableTopicContext<any>>;
   virgin: boolean;
 }
 
@@ -122,7 +136,7 @@ export interface IRegexParseResult<TInput> {
 */
 export type TopicsHandler<TMessage, TUserData> = (
   input: TMessage,
-  contexts?: IContexts<TMessage, TUserData | undefined>,
+  serializedContexts?: ISerializableContexts,
   userData?: TUserData
 ) => Promise<IResponse<TMessage, TUserData>>;
 
@@ -453,33 +467,84 @@ export function init<TMessage, TUserData>(
   allTopics: Array<ITopic<any, any, TMessage, TUserData | undefined>>,
   options: IInitOptions = {}
 ): TopicsHandler<TMessage, TUserData | undefined> {
+  /*
+    Convert the contexts to serializable form before responding.
+    This allows the host to store it somewhere, like a database.
+    What it actually means is that we remove things that aren't serializable, such as function instances.
+  */
+  function toSerializableContexts(contexts: IContexts<TMessage, TUserData>) {
+    const serializableContexts: ISerializableContexts = {
+      items: contexts.items.map(c => {
+        return {
+          activeConditions: c.activeConditions,
+          cb: c.cb ? c.cb.name : undefined,
+          data: c.data,
+          disabledConditions: c.disabledConditions,
+          parentTopic: c.parentTopic ? c.parentTopic.name : undefined,
+          topic: c.topic.name
+        };
+      }),
+      virgin: contexts.virgin
+    };
+    return serializableContexts;
+  }
+
+  /*
+    Contexts we receive for each call to handler will be in serialized form.
+    Need to reconstruct.
+  */
+  function reconstructContexts(serializableContexts: ISerializableContexts) {
+    const contexts: IContexts<TMessage, TUserData> = {
+      items: serializableContexts.items.map(c => {
+        const topic = findTopic(c.topic, allTopics);
+        const parentTopic = c.parentTopic
+          ? findTopic(c.parentTopic, allTopics)
+          : undefined;
+        return {
+          activeConditions: c.activeConditions,
+          cb: c.cb && parentTopic ? parentTopic.callbacks[c.cb] : undefined,
+          data: c.data,
+          disabledConditions: c.disabledConditions,
+          parentTopic,
+          topic
+        };
+      }),
+      virgin: serializableContexts.virgin
+    };
+    return contexts;
+  }
+
+  const topics = allTopics.filter(t => t.name !== "global");
+
+  const globalTopic: ITopic<
+    any,
+    any,
+    TMessage,
+    TUserData | undefined
+  > = findTopic("global", allTopics);
+
+  const mainTopic: ITopic<
+    any,
+    any,
+    TMessage,
+    TUserData | undefined
+  > = findTopic("main", topics);
+
+  const globalContext: ITopicContext<any, TMessage, TUserData | undefined> = {
+    activeConditions: [],
+    disabledConditions: [],
+    topic: globalTopic
+  };
+
   return async function doInit(
     input: TMessage,
-    contexts = { items: [], virgin: true },
+    contextsSerializedByHost = { items: [], virgin: true },
     userData = undefined
   ): Promise<IResponse<TMessage, TUserData>> {
-    const globalTopic: ITopic<
-      any,
-      any,
-      TMessage,
-      TUserData | undefined
-    > = findTopic("global", allTopics);
-    const topics = allTopics.filter(t => t.name !== "global");
-
-    const globalContext: ITopicContext<any, TMessage, TUserData | undefined> = {
-      activeConditions: [],
-      disabledConditions: [],
-      topic: globalTopic
-    };
+    const contexts = reconstructContexts(contextsSerializedByHost);
 
     if (contexts.virgin) {
       contexts.virgin = false;
-      const mainTopic: ITopic<
-        any,
-        any,
-        TMessage,
-        TUserData | undefined
-      > = findTopic("main", topics);
       if (mainTopic) {
         await enterTopic(
           { context: globalContext, contexts, userData },
@@ -500,7 +565,7 @@ export function init<TMessage, TUserData>(
     );
 
     return {
-      contexts,
+      contexts: toSerializableContexts(contexts),
       output: results
     };
   };
