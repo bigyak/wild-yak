@@ -35,7 +35,7 @@ export interface ITopicContext<TContextData, TMessage, TUserData> {
   disabledConditions: Array<string>;
   topic: ITopic<any, TContextData, TMessage, TUserData>;
   parentTopic?: ITopic<any, any, TMessage, TUserData>;
-  cb?: Function;
+  cb?: (state: IApplicationState<any, TMessage, TUserData>, args: any) => any;
 }
 
 export interface ISerializableTopicContext<TContextData> {
@@ -283,13 +283,7 @@ export async function enterTopic<
     TUserData | undefined
   >,
   args?: TNewInitArgs,
-  cb?: HandlerFunc<
-    TParentContextData,
-    TCallbackArgs,
-    TCallbackResult,
-    TMessage,
-    TUserData
-  >
+  cb?: (state: IApplicationState<any, TMessage, TUserData | undefined>, args: any) => any
 ): Promise<void> {
   const { context: currentContext, contexts, userData } = state;
 
@@ -329,19 +323,22 @@ export async function exitTopic<TContextData, TMessage, TUserData>(
 ): Promise<any> {
   const { context, contexts, userData } = state;
 
-  if (context !== activeContext(contexts)) {
+  if (context === activeContext(contexts)) {
+    const lastContext = contexts.items.pop();
+
+    if (lastContext && lastContext.cb) {
+      const cb = lastContext.cb;
+      return await cb(
+        {
+          context: activeContext(contexts),
+          contexts,
+          userData: state.userData
+        },
+        args
+      );
+    }
+  } else {
     throw new Error("You can only exit from the current context.");
-  }
-
-  const lastContext = contexts.items.pop();
-
-  if (lastContext && lastContext.cb) {
-    const cb = lastContext.cb;
-    const parentContext = activeContext(contexts);
-    return await cb(
-      { context: parentContext, contexts, userData: state.userData },
-      args
-    );
   }
 }
 
@@ -350,11 +347,11 @@ export async function clearAllTopics<TContextData, TMessage, TUserData>(
 ): Promise<void> {
   const { context, contexts, userData } = state;
 
-  if (context !== activeContext(contexts)) {
+  if (context === activeContext(contexts)) {
+    contexts.items = [];
+  } else {
     throw new Error("You can only exit from the current context.");
   }
-
-  contexts.items = [];
 }
 
 export function disableConditionsExcept<TContextData, TMessage, TUserData>(
