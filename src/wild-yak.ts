@@ -8,41 +8,41 @@ export interface IInitOptions {}
   We pass back the changed session also. 
   The caller should pass the same session back when calling again.
 */
-export interface IResponse<TMessage, TUserData> {
-  contexts: IContexts<TMessage, TUserData>;
+export interface IResponse<TMessage, TExternalContext> {
+  contexts: IContexts<TMessage, TExternalContext>;
   output: any[];
 }
 
 /*
   Definition of a Topic.
 */
-export interface ITopic<TInitArgs, TContextData, TMessage, TUserData>
-  extends ITopicBase<TInitArgs, TContextData, TUserData> {
+export interface ITopic<TInitArgs, TContextData, TMessage, TExternalContext>
+  extends ITopicBase<TInitArgs, TContextData, TExternalContext> {
   isRoot: boolean;
   callbacks: { [key: string]: (state: any, params: any) => Promise<any> };
-  conditions: Array<ICondition<TContextData, any, any, TMessage, TUserData>>;
+  conditions: Array<ICondition<TContextData, any, any, TMessage, TExternalContext>>;
   afterInit?: (
-    state: IApplicationState<TContextData, TMessage, TUserData>
+    state: IApplicationState<TContextData, TMessage, TExternalContext>
   ) => Promise<any | void>;
 }
 
 /*
   Context. This is where each topic stores its state.
 */
-export interface ITopicContext<TContextData, TMessage, TUserData> {
+export interface ITopicContext<TContextData, TMessage, TExternalContext> {
   data?: TContextData | void;
   activeConditions: Array<string>;
   disabledConditions: Array<string>;
-  topic: ITopic<any, TContextData, TMessage, TUserData>;
-  parentTopic?: ITopic<any, any, TMessage, TUserData>;
+  topic: ITopic<any, TContextData, TMessage, TExternalContext>;
+  parentTopic?: ITopic<any, any, TMessage, TExternalContext>;
   cb?: Function;
 }
 
 /*
   Contexts contain all the contexts.
 */
-export interface IContexts<TMessage, TUserData> {
-  items: Array<ITopicContext<any, TMessage, TUserData>>;
+export interface IContexts<TMessage, TExternalContext> {
+  items: Array<ITopicContext<any, TMessage, TExternalContext>>;
   virgin: boolean;
 }
 
@@ -50,8 +50,8 @@ export interface IContexts<TMessage, TUserData> {
   Conditions have predicates, which take an input and decide whether anything needs to be done with it.
   If the parser returns a value, it is passed on to the handler. If the result is undefined, skip this condition.
 */
-export type Predicate<TContextData, TParseResult, TMessage, TUserData> = (
-  state: IApplicationState<TContextData, TMessage, TUserData | undefined>,
+export type Predicate<TContextData, TParseResult, TMessage, TExternalContext> = (
+  state: IApplicationState<TContextData, TMessage, TExternalContext | undefined>,
   input: TMessage
 ) => Promise<TParseResult | void>;
 
@@ -64,9 +64,9 @@ export type HandlerFunc<
   TParseResult,
   TOutboundMessage,
   TMessage,
-  TUserData
+  TExternalContext
 > = (
-  state: IApplicationState<TContextData, TMessage, TUserData | undefined>,
+  state: IApplicationState<TContextData, TMessage, TExternalContext | undefined>,
   args: TParseResult
 ) => Promise<TOutboundMessage>;
 
@@ -78,34 +78,34 @@ export interface ICondition<
   TParseResult,
   TOutboundMessage,
   TMessage,
-  TUserData
+  TExternalContext
 > {
   name: string;
   predicate: Predicate<
     TContextData,
     TParseResult,
     TMessage,
-    TUserData | undefined
+    TExternalContext | undefined
   >;
   handler: HandlerFunc<
     TContextData,
     TParseResult,
     TOutboundMessage,
     TMessage,
-    TUserData | undefined
+    TExternalContext | undefined
   >;
 }
 
 /*
   State that is passed into every function.
-  Contains a context and an external userData.
-  The external userData helps the topic work with application state.
-  eg: userData.shoppingCart.items.count
+  Contains a context and an external externalContext.
+  The external externalContext helps the topic work with application state.
+  eg: externalContext.shoppingCart.items.count
 */
-export interface IApplicationState<TContextData, TMessage, TUserData> {
-  context: ITopicContext<TContextData, TMessage, TUserData | undefined>;
-  contexts: IContexts<TMessage, TUserData | undefined>;
-  userData: TUserData | undefined;
+export interface IApplicationState<TContextData, TMessage, TExternalContext> {
+  context: ITopicContext<TContextData, TMessage, TExternalContext | undefined>;
+  contexts: IContexts<TMessage, TExternalContext | undefined>;
+  externalContext: TExternalContext | undefined;
 }
 
 /*
@@ -120,26 +120,26 @@ export interface IRegexParseResult<TInput> {
 /*
   Handler returned to the external app. This is the entry point into Wild Yak
 */
-export type TopicsHandler<TMessage, TUserData> = (
+export type TopicsHandler<TMessage, TExternalContext> = (
   input: TMessage,
-  contexts?: IContexts<TMessage, TUserData | undefined>,
-  userData?: TUserData
-) => Promise<IResponse<TMessage, TUserData>>;
+  contexts?: IContexts<TMessage, TExternalContext | undefined>,
+  externalContext?: TExternalContext
+) => Promise<IResponse<TMessage, TExternalContext>>;
 
-export interface ITopicBase<TInitArgs, TContextData, TUserData> {
+export interface ITopicBase<TInitArgs, TContextData, TExternalContext> {
   name: string;
   init: (
     args?: TInitArgs,
-    userData?: TUserData
+    externalContext?: TExternalContext
   ) => Promise<TContextData | void>;
 }
 
-export function createTopic<TMessage, TUserData>() {
+export function createTopic<TMessage, TExternalContext>() {
   return <TInitArgs, TContextData>(
     name: string,
     topicInit: (
       args?: TInitArgs,
-      userData?: TUserData
+      externalContext?: TExternalContext
     ) => Promise<TContextData | void>
   ) => {
     const topic = {
@@ -147,28 +147,28 @@ export function createTopic<TMessage, TUserData>() {
       name
     };
 
-    return completeTopic<TInitArgs, TContextData, TMessage, TUserData>(topic);
+    return completeTopic<TInitArgs, TContextData, TMessage, TExternalContext>(topic);
   };
 }
 
-function completeTopic<TInitArgs, TContextData, TMessage, TUserData>(
-  topic: ITopicBase<TInitArgs, TContextData, TUserData | undefined>
+function completeTopic<TInitArgs, TContextData, TMessage, TExternalContext>(
+  topic: ITopicBase<TInitArgs, TContextData, TExternalContext | undefined>
 ) {
   return (options: {
     isRoot?: boolean;
     conditions?: Array<
-      ICondition<TContextData, any, any, TMessage, TUserData | undefined>
+      ICondition<TContextData, any, any, TMessage, TExternalContext | undefined>
     >;
     callbacks?: {
       [key: string]: (
-        state: IApplicationState<TContextData, TMessage, TUserData | undefined>,
+        state: IApplicationState<TContextData, TMessage, TExternalContext | undefined>,
         params: any
       ) => Promise<any | void>;
     };
     afterInit?: (
-      state: IApplicationState<TContextData, TMessage, TUserData | undefined>
+      state: IApplicationState<TContextData, TMessage, TExternalContext | undefined>
     ) => Promise<any | void>;
-  }): ITopic<TInitArgs, TContextData, TMessage, TUserData | undefined> => {
+  }): ITopic<TInitArgs, TContextData, TMessage, TExternalContext | undefined> => {
     return {
       afterInit: options.afterInit,
       callbacks: options.callbacks || {},
@@ -179,12 +179,12 @@ function completeTopic<TInitArgs, TContextData, TMessage, TUserData>(
   };
 }
 
-export function regexParse<TContextData, TMessage, TUserData>(
+export function regexParse<TContextData, TMessage, TExternalContext>(
   patterns: Array<RegExp>,
   inputToString: (input: TMessage) => string
 ) {
   return async (
-    state: IApplicationState<TContextData, TMessage, TUserData>,
+    state: IApplicationState<TContextData, TMessage, TExternalContext>,
     input: TMessage
   ): Promise<IRegexParseResult<TMessage> | void> => {
     const text = inputToString(input);
@@ -202,28 +202,28 @@ export function createCondition<
   TParseResult,
   TOutboundMessage,
   TMessage,
-  TUserData
+  TExternalContext
 >(
   name: string,
   predicate: Predicate<
     TContextData,
     TParseResult,
     TMessage,
-    TUserData | undefined
+    TExternalContext | undefined
   >,
   handler: HandlerFunc<
     TContextData,
     TParseResult,
     TOutboundMessage,
     TMessage,
-    TUserData | undefined
+    TExternalContext | undefined
   >
 ): ICondition<
   TContextData,
   TParseResult,
   TOutboundMessage,
   TMessage,
-  TUserData | undefined
+  TExternalContext | undefined
 > {
   return {
     handler,
@@ -232,16 +232,16 @@ export function createCondition<
   };
 }
 
-export function activeContext<TMessage, TUserData>(
-  contexts: IContexts<TMessage, TUserData | undefined>
-): ITopicContext<any, TMessage, TUserData | undefined> {
+export function activeContext<TMessage, TExternalContext>(
+  contexts: IContexts<TMessage, TExternalContext | undefined>
+): ITopicContext<any, TMessage, TExternalContext | undefined> {
   return contexts.items.slice(-1)[0];
 }
 
-function findTopic<TMessage, TUserData>(
+function findTopic<TMessage, TExternalContext>(
   name: string,
-  topics: Array<ITopic<any, any, TMessage, TUserData | undefined>>
-): ITopic<any, any, TMessage, TUserData | undefined> {
+  topics: Array<ITopic<any, any, TMessage, TExternalContext | undefined>>
+): ITopic<any, any, TMessage, TExternalContext | undefined> {
   return topics.filter(t => t.name === name)[0];
 }
 
@@ -253,20 +253,20 @@ export async function enterTopic<
   TCallbackArgs,
   TCallbackResult,
   TMessage,
-  TUserData
+  TExternalContext
 >(
-  state: IApplicationState<TParentContextData, TMessage, TUserData | undefined>,
+  state: IApplicationState<TParentContextData, TMessage, TExternalContext | undefined>,
   newTopic: ITopic<
     TNewInitArgs,
     TNewContextData,
     TMessage,
-    TUserData | undefined
+    TExternalContext | undefined
   >,
   parentTopic: ITopic<
     TParentInitArgs,
     TParentContextData,
     TMessage,
-    TUserData | undefined
+    TExternalContext | undefined
   >,
   args?: TNewInitArgs,
   cb?: HandlerFunc<
@@ -274,10 +274,10 @@ export async function enterTopic<
     TCallbackArgs,
     TCallbackResult,
     TMessage,
-    TUserData
+    TExternalContext
   >
 ): Promise<void> {
-  const { context: currentContext, contexts, userData } = state;
+  const { context: currentContext, contexts, externalContext } = state;
 
   const contextOnStack = activeContext(contexts);
 
@@ -288,11 +288,11 @@ export async function enterTopic<
   const newContext: ITopicContext<
     TNewContextData,
     TMessage,
-    TUserData | undefined
+    TExternalContext | undefined
   > = {
     activeConditions: [],
     cb,
-    data: await newTopic.init(args, userData),
+    data: await newTopic.init(args, externalContext),
     disabledConditions: [],
     parentTopic,
     topic: newTopic
@@ -305,15 +305,15 @@ export async function enterTopic<
   }
 
   if (newTopic.afterInit) {
-    await newTopic.afterInit({ context: newContext, contexts, userData });
+    await newTopic.afterInit({ context: newContext, contexts, externalContext });
   }
 }
 
-export async function exitTopic<TContextData, TMessage, TUserData>(
-  state: IApplicationState<TContextData, TMessage, TUserData | undefined>,
+export async function exitTopic<TContextData, TMessage, TExternalContext>(
+  state: IApplicationState<TContextData, TMessage, TExternalContext | undefined>,
   args?: any
 ): Promise<any> {
-  const { context, contexts, userData } = state;
+  const { context, contexts, externalContext } = state;
 
   if (context !== activeContext(contexts)) {
     throw new Error("You can only exit from the current context.");
@@ -325,16 +325,16 @@ export async function exitTopic<TContextData, TMessage, TUserData>(
     const cb = lastContext.cb;
     const parentContext = activeContext(contexts);
     return await cb(
-      { context: parentContext, contexts, userData: state.userData },
+      { context: parentContext, contexts, externalContext: state.externalContext },
       args
     );
   }
 }
 
-export async function clearAllTopics<TContextData, TMessage, TUserData>(
-  state: IApplicationState<TContextData, TMessage, TUserData | undefined>
+export async function clearAllTopics<TContextData, TMessage, TExternalContext>(
+  state: IApplicationState<TContextData, TMessage, TExternalContext | undefined>
 ): Promise<void> {
-  const { context, contexts, userData } = state;
+  const { context, contexts, externalContext } = state;
 
   if (context !== activeContext(contexts)) {
     throw new Error("You can only exit from the current context.");
@@ -343,15 +343,15 @@ export async function clearAllTopics<TContextData, TMessage, TUserData>(
   contexts.items = [];
 }
 
-export function disableConditionsExcept<TContextData, TMessage, TUserData>(
-  state: IApplicationState<TContextData, TMessage, TUserData | undefined>,
+export function disableConditionsExcept<TContextData, TMessage, TExternalContext>(
+  state: IApplicationState<TContextData, TMessage, TExternalContext | undefined>,
   list: Array<string>
 ): void {
   state.context.activeConditions = list;
 }
 
-export function disableConditions<TContextData, TMessage, TUserData>(
-  state: IApplicationState<TContextData, TMessage, TUserData | undefined>,
+export function disableConditions<TContextData, TMessage, TExternalContext>(
+  state: IApplicationState<TContextData, TMessage, TExternalContext | undefined>,
   list: Array<string>
 ): void {
   state.context.disabledConditions = list;
@@ -362,19 +362,19 @@ async function runCondition<
   TParseResult,
   TOutboundMessage,
   TMessage,
-  TUserData
+  TExternalContext
 >(
   condition: ICondition<
     TContextData,
     TParseResult,
     TOutboundMessage,
     TMessage,
-    TUserData | undefined
+    TExternalContext | undefined
   >,
-  state: IApplicationState<TContextData, TMessage, TUserData | undefined>,
+  state: IApplicationState<TContextData, TMessage, TExternalContext | undefined>,
   input: TMessage
 ): Promise<[boolean, TOutboundMessage] | [false, any]> {
-  const { context, userData } = state;
+  const { context, externalContext } = state;
   const parseResult = await condition.predicate(state, input);
   if (parseResult !== undefined) {
     const handlerResult = await condition.handler(state, parseResult);
@@ -384,13 +384,13 @@ async function runCondition<
   }
 }
 
-async function processMessage<TOutboundMessage, TMessage, TUserData>(
+async function processMessage<TOutboundMessage, TMessage, TExternalContext>(
   input: any,
-  contexts: IContexts<TMessage, TUserData | undefined>,
-  userData: TUserData | undefined,
-  globalContext: ITopicContext<any, TMessage, TUserData | undefined>,
-  globalTopic: ITopic<any, any, TMessage, TUserData | undefined>,
-  topics: Array<ITopic<any, any, TMessage, TUserData | undefined>>
+  contexts: IContexts<TMessage, TExternalContext | undefined>,
+  externalContext: TExternalContext | undefined,
+  globalContext: ITopicContext<any, TMessage, TExternalContext | undefined>,
+  globalTopic: ITopic<any, any, TMessage, TExternalContext | undefined>,
+  topics: Array<ITopic<any, any, TMessage, TExternalContext | undefined>>
 ): Promise<Array<any>> {
   let handlerResult: any;
 
@@ -406,7 +406,7 @@ async function processMessage<TOutboundMessage, TMessage, TUserData>(
       for (const condition of currentTopic.conditions) {
         [handled, handlerResult] = await runCondition(
           condition,
-          { context, contexts, userData },
+          { context, contexts, externalContext },
           input
         );
         if (handled) {
@@ -433,7 +433,7 @@ async function processMessage<TOutboundMessage, TMessage, TUserData>(
       ) {
         [handled, handlerResult] = await runCondition(
           condition,
-          { context: context || globalContext, contexts, userData },
+          { context: context || globalContext, contexts, externalContext },
           input
         );
         if (handled) {
@@ -449,24 +449,24 @@ async function processMessage<TOutboundMessage, TMessage, TUserData>(
     : [];
 }
 
-export function init<TMessage, TUserData>(
-  allTopics: Array<ITopic<any, any, TMessage, TUserData | undefined>>,
+export function init<TMessage, TExternalContext>(
+  allTopics: Array<ITopic<any, any, TMessage, TExternalContext | undefined>>,
   options: IInitOptions = {}
-): TopicsHandler<TMessage, TUserData | undefined> {
+): TopicsHandler<TMessage, TExternalContext | undefined> {
   return async function doInit(
     input: TMessage,
     contexts = { items: [], virgin: true },
-    userData = undefined
-  ): Promise<IResponse<TMessage, TUserData>> {
+    externalContext = undefined
+  ): Promise<IResponse<TMessage, TExternalContext>> {
     const globalTopic: ITopic<
       any,
       any,
       TMessage,
-      TUserData | undefined
+      TExternalContext | undefined
     > = findTopic("global", allTopics);
     const topics = allTopics.filter(t => t.name !== "global");
 
-    const globalContext: ITopicContext<any, TMessage, TUserData | undefined> = {
+    const globalContext: ITopicContext<any, TMessage, TExternalContext | undefined> = {
       activeConditions: [],
       disabledConditions: [],
       topic: globalTopic
@@ -478,11 +478,11 @@ export function init<TMessage, TUserData>(
         any,
         any,
         TMessage,
-        TUserData | undefined
+        TExternalContext | undefined
       > = findTopic("main", topics);
       if (mainTopic) {
         await enterTopic(
-          { context: globalContext, contexts, userData },
+          { context: globalContext, contexts, externalContext },
           mainTopic,
           globalTopic,
           undefined
@@ -493,7 +493,7 @@ export function init<TMessage, TUserData>(
     const results = await processMessage(
       input,
       contexts,
-      userData,
+      externalContext,
       globalContext,
       globalTopic,
       topics

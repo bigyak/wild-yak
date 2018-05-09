@@ -20,7 +20,7 @@ export interface IMessage {
   text: string;
 }
 
-export interface IUserData {
+export interface IExternalContext {
   x: number;
 }
 
@@ -42,8 +42,8 @@ export interface IEnvType {
   exitTopic_assertTopContextTest?: boolean;
 }
 
-function regex<TContextData, TUserData>(patterns: Array<RegExp>) {
-  return regexParse<TContextData, IMessage, TUserData>(patterns, x => x.text);
+function regex<TContextData, TExternalContext>(patterns: Array<RegExp>) {
+  return regexParse<TContextData, IMessage, TExternalContext>(patterns, x => x.text);
 }
 
 export default function getTopics(options?: IGetTopicsOptions) {
@@ -61,9 +61,9 @@ export default function getTopics(options?: IGetTopicsOptions) {
     _mainState: {} // FIXME
   };
 
-  const mainTopic = createTopic<IMessage, IUserData>()(
+  const mainTopic = createTopic<IMessage, IExternalContext>()(
     "main",
-    async (args: any, userData) => {
+    async (args: any, externalContext) => {
       env._enteredMain = true;
     }
   )({
@@ -99,9 +99,9 @@ export default function getTopics(options?: IGetTopicsOptions) {
     isRoot: true
   });
 
-  const nicknameTopic = createTopic<IMessage, IUserData>()(
+  const nicknameTopic = createTopic<IMessage, IExternalContext>()(
     "nickname",
-    async (args, userData) => {
+    async (args, externalContext) => {
       env._enteredNickname = true;
     }
   )({
@@ -117,9 +117,9 @@ export default function getTopics(options?: IGetTopicsOptions) {
     isRoot: true
   });
 
-  const mathTopic = createTopic<IMessage, IUserData>()(
+  const mathTopic = createTopic<IMessage, IExternalContext>()(
     "math",
-    async (args, userData) => {
+    async (args, externalContext) => {
       env._enteredMath = true;
       return { x: 10 };
     }
@@ -127,9 +127,9 @@ export default function getTopics(options?: IGetTopicsOptions) {
     isRoot: true
   });
 
-  const wildcardTopic = createTopic<IMessage, IUserData>()(
+  const wildcardTopic = createTopic<IMessage, IExternalContext>()(
     "wildcard",
-    async (args, userData) => {
+    async (args, externalContext) => {
       env._enteredWildcard = true;
     }
   )({
@@ -144,9 +144,9 @@ export default function getTopics(options?: IGetTopicsOptions) {
     isRoot: true
   });
 
-  const mathExpTopic = createTopic<IMessage, IUserData>()(
+  const mathExpTopic = createTopic<IMessage, IExternalContext>()(
     "mathexp",
-    async (args, userData) => {
+    async (args, externalContext) => {
       env._enteredMathExp = true;
     }
   )({
@@ -154,7 +154,7 @@ export default function getTopics(options?: IGetTopicsOptions) {
   });
 
   async function onValidateName(
-    state: IApplicationState<any, IMessage, IUserData | undefined>,
+    state: IApplicationState<any, IMessage, IExternalContext | undefined>,
     args: { success: boolean; name: string }
   ) {
     const { success, name } = args;
@@ -162,9 +162,9 @@ export default function getTopics(options?: IGetTopicsOptions) {
     return `you signed up as ${name}.`;
   }
 
-  const signupTopic = createTopic<IMessage, IUserData>()(
+  const signupTopic = createTopic<IMessage, IExternalContext>()(
     "signup",
-    async (args, userData) => {
+    async (args, externalContext) => {
       env._enteredSignup = true;
     }
   )({
@@ -189,9 +189,9 @@ export default function getTopics(options?: IGetTopicsOptions) {
     isRoot: true
   });
 
-  const validateTopic = createTopic<IMessage, IUserData>()(
+  const validateTopic = createTopic<IMessage, IExternalContext>()(
     "validate",
-    async (args: { P: boolean } | undefined, userData) => {
+    async (args: { P: boolean } | undefined, externalContext) => {
       env._enteredValidate = true;
     }
   )({
@@ -210,18 +210,18 @@ export default function getTopics(options?: IGetTopicsOptions) {
     ]
   });
 
-  const defaultTopic = createTopic<IMessage, IUserData>()(
+  const defaultTopic = createTopic<IMessage, IExternalContext>()(
     "default",
-    async (args, userData) => {
+    async (args, externalContext) => {
       env._enteredDefault = true;
     }
   )({
     isRoot: false
   });
 
-  const globalTopic = createTopic<IMessage, IUserData>()(
+  const globalTopic = createTopic<IMessage, IExternalContext>()(
     "global",
-    async (args, userData) => undefined
+    async (args, externalContext) => undefined
   )({
     conditions: [
       createCondition(
