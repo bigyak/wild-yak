@@ -1,3 +1,4 @@
+import { resolve } from "path";
 import { IEvalState, IHandlerResult, ITopic, TopicBase } from "..";
 
 export interface IMessage {
@@ -14,35 +15,56 @@ export interface IHost {
   getUserDirectory(username: string): string;
 }
 
-export class DefaultTopic extends TopicBase<IMessage, IUserData, IHost>
-  implements ITopic<IMessage, IUserData, IHost> {
-  async handle(
-    state: IEvalState<IMessage, IUserData, IHost>,
-    message: IMessage,
-    userData: IUserData,
-    host: IHost
-  ): Promise<IHandlerResult> {
-    return message.text === "hello world"
-      ? { handled: true, result: "greetings comrade!" }
-      : { handled: false };
-  }
+export type ResultType = string | number | undefined;
 
-  isTopLevel() {
-    return true;
-  }
+function basicMathOperators(text: string) {
+  const [p1, p2, p3] = text.split(" ");
+  const [operand1, operand2] = [parseInt(p2, 10), parseInt(p3, 10)];
+  return p1 === "add"
+    ? operand1 + operand2
+    : p1 === "substract"
+      ? operand1 - operand2
+      : p1 === "multiply"
+        ? operand1 * operand2
+        : p1 === "divide"
+          ? operand1 / operand2
+          : undefined;
 }
 
-export class RootTopic extends TopicBase<IMessage, IUserData, IHost>
-  implements ITopic<IMessage, IUserData, IHost> {
+function advancedMathOperators(text: string) {
+  const result = basicMathOperators(text);
+  return result === undefined
+    ? (() => {
+        const [p1, p2, p3] = text.split(" ");
+        const [operand1, operand2] = [parseInt(p2, 10), parseInt(p3, 10)];
+        return p1 === "exp" ? operand1 ** operand2 : undefined;
+      })()
+    : result;
+}
+
+export class RootTopic extends TopicBase<IMessage, ResultType, IUserData, IHost>
+  implements ITopic<IMessage, ResultType, IUserData, IHost> {
   async handle(
-    state: IEvalState<IMessage, IUserData, IHost>,
+    state: IEvalState<IMessage, ResultType, IUserData, IHost>,
     message: IMessage,
     userData: IUserData,
     host: IHost
-  ): Promise<IHandlerResult> {
-    if (message.text === "do math") {
+  ): Promise<IHandlerResult<ResultType>> {
+    if (message.text === "do basic math") {
       this.enterTopic(state, new MathTopic());
       return { handled: true, result: "You can type a math expression" };
+    } else if (message.text === "help") {
+      this.enterTopic(state, new HelpTopic());
+      return {
+        handled: true,
+        result: "You're entering help mode. Type anything."
+      };
+    } else if (message.text === "reset password") {
+      this.enterTopic(state, new PasswordResetTopic());
+      return {
+        handled: true,
+        result: "Set your password."
+      };
     } else {
       return {
         handled: true,
@@ -53,14 +75,33 @@ export class RootTopic extends TopicBase<IMessage, IUserData, IHost>
   }
 }
 
-export class MathTopic extends TopicBase<IMessage, IUserData, IHost>
-  implements ITopic<IMessage, IUserData, IHost> {
+export class DefaultTopic
+  extends TopicBase<IMessage, ResultType, IUserData, IHost>
+  implements ITopic<IMessage, ResultType, IUserData, IHost> {
   async handle(
-    state: IEvalState<IMessage, IUserData, IHost>,
+    state: IEvalState<IMessage, ResultType, IUserData, IHost>,
     message: IMessage,
     userData: IUserData,
     host: IHost
-  ): Promise<IHandlerResult> {
+  ): Promise<IHandlerResult<ResultType>> {
+    return message.text === "hello world"
+      ? { handled: true, result: "greetings comrade!" }
+      : { handled: false };
+  }
+
+  isTopLevel() {
+    return true;
+  }
+}
+
+export class MathTopic extends TopicBase<IMessage, ResultType, IUserData, IHost>
+  implements ITopic<IMessage, ResultType, IUserData, IHost> {
+  async handle(
+    state: IEvalState<IMessage, ResultType, IUserData, IHost>,
+    message: IMessage,
+    userData: IUserData,
+    host: IHost
+  ): Promise<IHandlerResult<ResultType>> {
     if (message.text === "do advanced math") {
       this.enterTopic(state, new AdvancedMathTopic());
       return {
@@ -68,9 +109,13 @@ export class MathTopic extends TopicBase<IMessage, IUserData, IHost>
         result: "You can do advanced math now."
       };
     } else {
+      const result = basicMathOperators(message.text);
       return {
         handled: true,
-        result: eval(message.text)
+        result:
+          typeof result !== "undefined"
+            ? result
+            : "I don't know how to handle this."
       };
     }
   }
@@ -80,17 +125,50 @@ export class MathTopic extends TopicBase<IMessage, IUserData, IHost>
   }
 }
 
-export class AdvancedMathTopic extends TopicBase<IMessage, IUserData, IHost>
-  implements ITopic<IMessage, IUserData, IHost> {
+export class AdvancedMathTopic
+  extends TopicBase<IMessage, ResultType, IUserData, IHost>
+  implements ITopic<IMessage, ResultType, IUserData, IHost> {
   async handle(
-    state: IEvalState<IMessage, IUserData, IHost>,
+    state: IEvalState<IMessage, ResultType, IUserData, IHost>,
     message: IMessage,
     userData: IUserData,
     host: IHost
-  ): Promise<IHandlerResult> {
+  ): Promise<IHandlerResult<ResultType>> {
+    if (message.text === "do basic math") {
+      this.exitTopic(state);
+      return {
+        handled: true,
+        result: "Back to basic math."
+      };
+    } else {
+      const result = advancedMathOperators(message.text);
+      return {
+        handled: true,
+        result:
+          typeof result !== "undefined"
+            ? result
+            : "I don't know how to handle this."
+      };
+    }
+  }
+
+  isTopLevel() {
+    return false;
+  }
+}
+
+export class HelpTopic extends TopicBase<IMessage, ResultType, IUserData, IHost>
+  implements ITopic<IMessage, ResultType, IUserData, IHost> {
+  async handle(
+    state: IEvalState<IMessage, ResultType, IUserData, IHost>,
+    message: IMessage,
+    userData: IUserData,
+    host: IHost
+  ): Promise<IHandlerResult<ResultType>> {
+    this.exitTopic(state);
     return {
       handled: true,
-      result: eval(message.text)
+      result: "HELP: This is just a test suite. Nothing to see here, sorry."
     };
   }
 
@@ -99,243 +177,42 @@ export class AdvancedMathTopic extends TopicBase<IMessage, IUserData, IHost>
   }
 }
 
-// const mainTopic = createTopic<IMessage, IUserData>()(
-//   "main",
-//   async (m: boolean) => {
-//     env._enteredMain = true;
-//     return true;
-//   }
-// )({
-//   afterInit: async state => {
-//     if (
-//       env.enterTopic_assertTopContextTest ||
-//       env.exitTopic_assertTopContextTest
-//     ) {
-//       env._mainState = state;
-//       await enterTopic(state, nicknameTopic, mainTopic, 1);
-//     }
-//   },
-//   conditions: [
-//     createCondition(
-//       "respond-to-hello",
-//       regex([/^Hello (.*)$/]),
-//       async (state, { matches }) => {
-//         return "hey, what's up!";
-//       }
-//     ),
-//     createCondition(
-//       "boomshanker",
-//       async (state, message) => {
-//         if (message && message.text === "Boomshanker") {
-//           return "zomg!";
-//         }
-//       },
-//       async (state, zomg) => {
-//         return `omg ${zomg}`;
-//       }
-//     )
-//   ],
-//   isRoot: true
-// });
+export class PasswordResetTopic
+  extends TopicBase<IMessage, ResultType, IUserData, IHost>
+  implements ITopic<IMessage, ResultType, IUserData, IHost> {
+  password?: string;
+  repeatPassword?: string;
 
-// const nicknameTopic = createTopic<IMessage, IUserData>()(
-//   "nickname",
-//   async (args: boolean) => {
-//     env._enteredNickname = true;
-//     return true;
-//   }
-// )({
-//   afterInit: async () => {
-//     if (env.enterTopic_assertTopContextTest) {
-//       await enterTopic(env._mainState, defaultTopic, mathTopic);
-//     }
-//     if (env.exitTopic_assertTopContextTest) {
-//       await exitTopic(env._mainState);
-//     }
-//   },
-//   conditions: [
-//     createCondition("testi", regex([/^name$/]), async (x, y) => 1)
-//   ],
+  async handle(
+    state: IEvalState<IMessage, ResultType, IUserData, IHost>,
+    message: IMessage,
+    userData: IUserData,
+    host: IHost
+  ): Promise<IHandlerResult<ResultType>> {
+    if (!this.password) {
+      this.password = message.text;
+      return {
+        handled: true,
+        result: "Repeat your password."
+      };
+    } else {
+      if (message.text === this.password) {
+        this.exitTopic(state);
+        return {
+          handled: true,
+          result: "Password reset complete."
+        };
+      } else {
+        this.password = undefined;
+        return {
+          handled: true,
+          result: "Password don't match. Reenter both passwords."
+        };
+      }
+    }
+  }
 
-//   isRoot: true
-// });
-
-// const mathTopic = createTopic<IMessage, IUserData>()(
-//   "math",
-//   async (args: void, userData?: IUserData) => {
-//     env._enteredMath = true;
-//   }
-// )({
-//   isRoot: true
-// });
-
-// const wildcardTopic = createTopic<IMessage, IUserData>()(
-//   "wildcard",
-//   async (args: void, userData?: IUserData) => {
-//     env._enteredWildcard = true;
-//   }
-// )({
-//   afterInit: async state => {
-//     if (env._disabled !== undefined) {
-//       disableConditions(state, env._disabled);
-//     }
-//     if (env._enabled !== undefined) {
-//       disableConditionsExcept(state, env._enabled);
-//     }
-//   },
-//   isRoot: true
-// });
-
-// const mathExpTopic = createTopic<IMessage, IUserData>()(
-//   "mathexp",
-//   async (args: void, userData?: IUserData) => {
-//     env._enteredMathExp = true;
-//   }
-// )({
-//   isRoot: true
-// });
-
-// async function onValidateName(
-//   state: IApplicationState<any, IMessage, IUserData | undefined>,
-//   args: { success: boolean; name: string }
-// ) {
-//   const { success, name } = args;
-//   env._enteredOnValidateName = true;
-//   return `you signed up as ${name}.`;
-// }
-
-// const signupTopic = createTopic<IMessage, IUserData>()(
-//   "signup",
-//   async (args: void, userData?: IUserData) => {
-//     env._enteredSignup = true;
-//   }
-// )({
-//   callbacks: {
-//     onValidateName
-//   },
-//   conditions: [
-//     createCondition(
-//       "validate",
-//       regex([/^name$/]),
-//       async (state, { matches }) => {
-//         await enterTopic(
-//           state,
-//           validateTopic,
-//           signupTopic,
-//           { P: true },
-//           onValidateName
-//         );
-//       }
-//     )
-//   ],
-//   isRoot: true
-// });
-
-// const validateTopic = createTopic<IMessage, IUserData>()(
-//   "validate",
-//   async (args: { P: boolean } | undefined, userData?: IUserData) => {
-//     env._enteredValidate = true;
-//   }
-// )({
-//   conditions: [
-//     createCondition(
-//       "validate",
-//       regex([/^name (.*)$/]),
-//       async (state, { matches }) => {
-//         if (!env._clearAllTopics) {
-//           await exitTopic(state, { success: true });
-//         } else {
-//           await clearAllTopics(state);
-//         }
-//       }
-//     )
-//   ]
-// });
-
-// const defaultTopic = createTopic<IMessage, IUserData>()(
-//   "default",
-//   async (args, userData) => {
-//     env._enteredDefault = true;
-//   }
-// )({
-//   isRoot: false
-// });
-
-// const globalTopic = createTopic<IMessage, IUserData>()(
-//   "global",
-//   async (args, userData) => undefined
-// )({
-//   conditions: [
-//     createCondition(
-//       "nickname",
-//       regex([/^nick ([A-z]\w*)$/, /^nickname ([A-z]\w*)$/]),
-//       async (state, { matches }) => {
-//         await enterTopic(state, nicknameTopic, globalTopic, matches[1]);
-//       }
-//     ),
-//     createCondition(
-//       "calc",
-//       async (state, message) => {
-//         const regexpr = /^[0-9\(\)\+\-*/\s]+$/;
-//         if (message && regexpr.exec(message.text) !== null) {
-//           try {
-//             return eval(message.text);
-//           } catch (e) {
-//             console.log(e);
-//           }
-//         }
-//       },
-//       async (state, result) => {
-//         await enterTopic(state, mathTopic, globalTopic, result);
-//       }
-//     ),
-//     createCondition(
-//       "wildcard",
-//       regex([/^wildcard ([A-z].*)$/, /^wild ([A-z].*)$/]),
-//       async (state, { matches }) => {
-//         await enterTopic(state, wildcardTopic, globalTopic, matches[1]);
-//       }
-//     ),
-//     createCondition(
-//       "mathexp",
-//       regex([/^5 \+ 10$/, /^100\/4$/]),
-//       async (state, { matches }) => {
-//         await enterTopic(state, mathExpTopic, globalTopic, matches[0]);
-//       }
-//     ),
-//     createCondition(
-//       "signup",
-//       regex([/^signup (.*)$/]),
-//       async (state, { matches }) => {
-//         await enterTopic(state, signupTopic, globalTopic, matches[1]);
-//       }
-//     ),
-//     createCondition(
-//       "default",
-//       async (state, message: IMessage) => {
-//         return message;
-//       },
-//       async (state, message: IMessage) => {
-//         await enterTopic(state, defaultTopic, globalTopic, message);
-//       }
-//     )
-//   ],
-//   isRoot: true
-// });
-
-// const allTopics = [
-//   globalTopic,
-//   mainTopic,
-//   nicknameTopic,
-//   mathTopic,
-//   wildcardTopic,
-//   mathExpTopic,
-//   signupTopic,
-//   validateTopic,
-//   defaultTopic
-// ];
-
-// const topics =
-//   options && options.includeMain
-//     ? allTopics
-//     : allTopics.filter(t => t.name !== "main");
+  isTopLevel() {
+    return true;
+  }
+}

@@ -2,9 +2,9 @@ export interface ITopicCtor<T> {
   new (): T;
 }
 
-export interface IEvalState<TMessage, TUserData, THost> {
-  topics: ITopic<TMessage, TUserData, THost>[];
-  rootTopic: ITopic<TMessage, TUserData, THost>;
+export interface IEvalState<TMessage, TResult, TUserData, THost> {
+  topics: ITopic<TMessage, TResult, TUserData, THost>[];
+  rootTopic: ITopic<TMessage, TResult, TUserData, THost>;
   virgin: boolean;
 }
 
@@ -19,34 +19,35 @@ export interface ISerializableEvalState {
   topics: ISerializableTopic[];
   rootTopic: ISerializableTopic;
   virgin: boolean;
+  used?: boolean;
 }
 
-export interface IHandlerResult {
+export interface IHandlerResult<TResult> {
   handled: boolean;
-  result?: any;
+  result?: TResult;
 }
 
-export interface ITopic<TMessage, TUserData, THost> {
+export interface ITopic<TMessage, TResult, TUserData, THost> {
   handle(
-    state: IEvalState<TMessage, TUserData, THost>,
+    state: IEvalState<TMessage, TResult, TUserData, THost>,
     message: TMessage,
     userData: TUserData,
     host: THost
-  ): Promise<IHandlerResult>;
+  ): Promise<IHandlerResult<TResult>>;
   isTopLevel?(): boolean;
 }
 
-export abstract class TopicBase<TMessage, TUserData, THost> {
+export abstract class TopicBase<TMessage, TResult, TUserData, THost> {
   enterTopic(
-    evalState: IEvalState<TMessage, TUserData, THost>,
-    topic: ITopic<TMessage, TUserData, THost>
+    evalState: IEvalState<TMessage, TResult, TUserData, THost>,
+    topic: ITopic<TMessage, TResult, TUserData, THost>
   ) {
     const currentTopic = getActiveTopic(evalState);
     if (
       evalState.rootTopic === (this as any) ||
       currentTopic === (this as any)
     ) {
-      evalState.topics.push(topic);
+      enterTopic(evalState, topic);
     } else {
       throw new Error(
         `The caller is not the currently active topic. This is an error in code.`
@@ -54,13 +55,13 @@ export abstract class TopicBase<TMessage, TUserData, THost> {
     }
   }
 
-  exitTopic(evalState: IEvalState<TMessage, TUserData, THost>) {
+  exitTopic(evalState: IEvalState<TMessage, TResult, TUserData, THost>) {
     const currentTopic = getActiveTopic(evalState);
     if (
       evalState.rootTopic === (this as any) ||
       currentTopic === (this as any)
     ) {
-      evalState.topics.pop();
+      exitTopic(evalState);
     } else {
       throw new Error(
         `The caller is not the currently active topic. This is an error in code.`
@@ -69,24 +70,26 @@ export abstract class TopicBase<TMessage, TUserData, THost> {
   }
 }
 
-interface ITopicMap<TMessage, TUserData, THost> {
-  [key: string]: ITopicCtor<ITopic<TMessage, TUserData, THost>>;
+interface ITopicMap<TMessage, TResult, TUserData, THost> {
+  [key: string]: ITopicCtor<ITopic<TMessage, TResult, TUserData, THost>>;
 }
 
-function getActiveTopic<TMessage, TUserData, THost>(
-  evalState: IEvalState<TMessage, TUserData, THost>
-): ITopic<TMessage, TUserData, THost> {
+function getActiveTopic<TMessage, TResult, TUserData, THost>(
+  evalState: IEvalState<TMessage, TResult, TUserData, THost>
+): ITopic<TMessage, TResult, TUserData, THost> {
   return evalState.topics.slice(-1)[0];
 }
 
-async function processMessage<TMessage, TUserData, THost>(
-  evalState: IEvalState<TMessage, TUserData, THost>,
+async function processMessage<TMessage, TResult, TUserData, THost>(
+  evalState: IEvalState<TMessage, TResult, TUserData, THost>,
   message: TMessage,
   userData: TUserData,
   host: THost,
-  rootTopic: ITopic<TMessage, TUserData, THost>
+  rootTopic: ITopic<TMessage, TResult, TUserData, THost>
 ) {
-  const activeTopic = getActiveTopic<TMessage, TUserData, THost>(evalState);
+  const activeTopic = getActiveTopic<TMessage, TResult, TUserData, THost>(
+    evalState
+  );
   const { handled, result } = await activeTopic.handle(
     evalState,
     message,
@@ -100,8 +103,8 @@ async function processMessage<TMessage, TUserData, THost>(
   }
 }
 
-function toSerializable<TMessage, TUserData, THost>(
-  state: IEvalState<TMessage, TUserData, THost>
+function toSerializable<TMessage, TResult, TUserData, THost>(
+  state: IEvalState<TMessage, TResult, TUserData, THost>
 ) {
   return {
     rootTopic: {
@@ -116,8 +119,8 @@ function toSerializable<TMessage, TUserData, THost>(
   };
 }
 
-function recreateTopicFromSerialized<TMessage, TUserData, THost>(
-  ctor: ITopicCtor<ITopic<TMessage, TUserData, THost>>,
+function recreateTopicFromSerialized<TMessage, TResult, TUserData, THost>(
+  ctor: ITopicCtor<ITopic<TMessage, TResult, TUserData, THost>>,
   source: { [key: string]: any }
 ) {
   const recreatedTopic: any = new ctor();
@@ -128,11 +131,11 @@ function recreateTopicFromSerialized<TMessage, TUserData, THost>(
   return recreatedTopic;
 }
 
-function recreateEvalState<TMessage, TUserData, THost>(
+function recreateEvalState<TMessage, TResult, TUserData, THost>(
   serializable: ISerializableEvalState,
-  topicMap: ITopicMap<TMessage, TUserData, THost>,
-  rootTopicCtor: ITopicCtor<ITopic<TMessage, TUserData, THost>>
-): IEvalState<TMessage, TUserData, THost> {
+  topicMap: ITopicMap<TMessage, TResult, TUserData, THost>,
+  rootTopicCtor: ITopicCtor<ITopic<TMessage, TResult, TUserData, THost>>
+): IEvalState<TMessage, TResult, TUserData, THost> {
   return {
     rootTopic: recreateTopicFromSerialized(
       rootTopicCtor,
@@ -145,9 +148,9 @@ function recreateEvalState<TMessage, TUserData, THost>(
   };
 }
 
-function enterTopic<TMessage, TUserData, THost>(
-  evalState: IEvalState<TMessage, TUserData, THost>,
-  topic: ITopic<TMessage, TUserData, THost>
+function enterTopic<TMessage, TResult, TUserData, THost>(
+  evalState: IEvalState<TMessage, TResult, TUserData, THost>,
+  topic: ITopic<TMessage, TResult, TUserData, THost>
 ) {
   if (topic.isTopLevel && topic.isTopLevel()) {
     evalState.topics = [topic];
@@ -156,24 +159,28 @@ function enterTopic<TMessage, TUserData, THost>(
   }
 }
 
-function exitTopic<TMessage, TUserData, THost>(
-  evalState: IEvalState<TMessage, TUserData, THost>,
-  current: ITopic<TMessage, TUserData, THost>
+function exitTopic<TMessage, TResult, TUserData, THost>(
+  evalState: IEvalState<TMessage, TResult, TUserData, THost>
 ) {
   evalState.topics.pop();
 }
 
-export function init<TMessage, TUserData, THost>(
-  rootTopicCtor: ITopicCtor<ITopic<TMessage, TUserData, THost>>,
-  defaultTopicCtor: ITopicCtor<ITopic<TMessage, TUserData, THost>>,
-  otherTopicCtors: ITopicCtor<ITopic<TMessage, TUserData, THost>>[]
+export function init<TMessage, TResult, TUserData, THost>(
+  rootTopicCtor: ITopicCtor<ITopic<TMessage, TResult, TUserData, THost>>,
+  defaultTopicCtor: ITopicCtor<ITopic<TMessage, TResult, TUserData, THost>>,
+  otherTopicCtors: ITopicCtor<ITopic<TMessage, TResult, TUserData, THost>>[]
 ) {
   const rootTopic = new rootTopicCtor();
 
-  const topicMap: ITopicMap<TMessage, TUserData, THost> = [defaultTopicCtor]
+  const topicMap: ITopicMap<TMessage, TResult, TUserData, THost> = [
+    defaultTopicCtor
+  ]
     .concat(otherTopicCtors)
     .reduce(
-      (acc: any, topicCtor: ITopicCtor<ITopic<TMessage, TUserData, THost>>) => {
+      (
+        acc: any,
+        topicCtor: ITopicCtor<ITopic<TMessage, TResult, TUserData, THost>>
+      ) => {
         acc[topicCtor.name] = topicCtor;
         return acc;
       },
@@ -191,30 +198,39 @@ export function init<TMessage, TUserData, THost>(
       virgin: true
     },
     userData: TUserData,
-    host: THost
-  ) {
-    const evalState = recreateEvalState(
-      stateSerializedByHost,
-      topicMap,
-      rootTopicCtor
-    );
+    host: THost,
+    options: { reuseState: boolean } = { reuseState: false }
+  ): Promise<{ result: any; state: ISerializableEvalState }> {
+    if (options.reuseState || !stateSerializedByHost.used) {
+      stateSerializedByHost.used = true;
 
-    if (evalState.virgin) {
-      evalState.virgin = false;
-      enterTopic(evalState, new defaultTopicCtor());
+      const evalState = recreateEvalState(
+        stateSerializedByHost,
+        topicMap,
+        rootTopicCtor
+      );
+
+      if (evalState.virgin) {
+        evalState.virgin = false;
+        enterTopic(evalState, new defaultTopicCtor());
+      }
+
+      const { handled, result } = await processMessage(
+        evalState,
+        message,
+        userData,
+        host,
+        evalState.rootTopic
+      );
+
+      return {
+        result,
+        state: toSerializable(evalState)
+      };
+    } else {
+      throw new Error(
+        "This evaluation state was previously used."
+      );
     }
-
-    const { handled, result } = await processMessage(
-      evalState,
-      message,
-      userData,
-      host,
-      evalState.rootTopic
-    );
-
-    return {
-      result,
-      state: toSerializable(evalState)
-    };
   };
 }

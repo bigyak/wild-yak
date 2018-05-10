@@ -1,17 +1,26 @@
 import "mocha";
 import "should";
-import { init } from "../";
+import { IEvalState, init, ISerializableEvalState } from "../";
 
 import {
+  AdvancedMathTopic,
   DefaultTopic,
+  HelpTopic,
   IHost,
   IMessage,
   IUserData,
   MathTopic,
+  PasswordResetTopic,
+  ResultType,
   RootTopic
 } from "./topics";
 
-const otherTopics = [MathTopic];
+const otherTopics = [
+  MathTopic,
+  AdvancedMathTopic,
+  HelpTopic,
+  PasswordResetTopic
+];
 
 function getUserData(): IUserData {
   return {
@@ -29,311 +38,240 @@ function getHost(): IHost {
 }
 
 function getHandler() {
-  return init<IMessage, IUserData, IHost>(RootTopic, DefaultTopic, otherTopics);
+  return init<IMessage, ResultType, IUserData, IHost>(
+    RootTopic,
+    DefaultTopic,
+    otherTopics
+  );
+}
+
+function fakeSaveState(obj: any) {
+  return JSON.stringify(obj);
+}
+
+function fakeRecreateState(serialized: string) {
+  return JSON.parse(serialized);
+}
+
+async function assertFor(
+  handler: (
+    message: IMessage,
+    stateSerializedByHost: ISerializableEvalState | undefined,
+    userData: IUserData,
+    host: IHost,
+    options?: { reuseState: boolean }
+  ) => Promise<{ result: any; state: ISerializableEvalState }>,
+  input: string,
+  state: ISerializableEvalState | undefined,
+  result: any,
+  options?: { reuseState: boolean }
+) {
+  const realState = state ? fakeRecreateState(fakeSaveState(state)) : undefined;
+
+  const message = {
+    text: input
+  };
+
+  const output = await handler(
+    message,
+    realState,
+    getUserData(),
+    getHost(),
+    options
+  );
+
+  output.result.should.equal(result);
+
+  return output;
 }
 
 describe("Wild yak", () => {
-  it("init() returns a handler", async () => {
+  it("returns a handler on calling init()", async () => {
     const handler = getHandler();
     handler.should.be.an.instanceOf(Function);
   });
 
-  it("Enters the default topic while starting", async () => {
+  it("enters the default topic while starting", async () => {
     const handler = getHandler();
-
-    const message = {
-      text: "hello world"
-    };
-
-    const output = await handler(message, undefined, getUserData(), getHost());
-
-    output.result.should.equal("greetings comrade!");
+    const output = await assertFor(
+      handler,
+      "hello world",
+      undefined,
+      "greetings comrade!"
+    );
+    output.state.topics.length.should.equal(1);
   });
 
-  it("If not handled otherwise, should be handled by root topic", async () => {
+  it("handles a message with the root topic if nothing else matches", async () => {
     const handler = getHandler();
 
-    const message = {
-      text: "something something!"
-    };
-
-    const output = await handler(message, undefined, getUserData(), getHost());
-
-    output.result.should.equal(
+    const output = await assertFor(
+      handler,
+      "something something!",
+      undefined,
       "Life is like riding a bicycle. To keep your balance you must keep moving."
     );
+    output.state.topics.length.should.equal(1);
   });
 
-  it("Enters a new topic from the root topic", async () => {
+  it("enters a new topic", async () => {
     const handler = getHandler();
 
-    const message1 = {
-      text: "do math"
-    };
-
-    const output1 = await handler(
-      message1,
+    const output1 = await assertFor(
+      handler,
+      "do basic math",
       undefined,
-      getUserData(),
-      getHost()
+      "You can type a math expression"
     );
-    output1.result.should.equal("You can type a math expression");
 
-    const message2 = {
-      text: "2 + 3"
-    };
+    const output2 = await assertFor(handler, "add 2 3", output1.state, 5);
+    output2.state.topics.length.should.equal(1);
 
-    const output2 = await handler(
-      message2,
-      output1.state,
-      getUserData(),
-      getHost()
-    );
-    output2.result.should.equal(5);
-
-    const message3 = {
-      text: "20 + 30"
-    };
-
-    const output3 = await handler(
-      message3,
-      output1.state,
-      getUserData(),
-      getHost()
-    );
-    output3.result.should.equal(50);
+    const output3 = await assertFor(handler, "add 20 30", output2.state, 50);
+    output3.state.topics.length.should.equal(1);
   });
 
-  it("Enters a new topic from the root topic", async () => {
+  it("enters a subtopic and exits", async () => {
     const handler = getHandler();
 
-    const message1 = {
-      text: "do math"
-    };
-
-    const output1 = await handler(
-      message1,
+    const output1 = await assertFor(
+      handler,
+      "do basic math",
       undefined,
-      getUserData(),
-      getHost()
+      "You can type a math expression"
     );
-    output1.result.should.equal("You can type a math expression");
 
-    const message2 = {
-      text: "2 + 3"
-    };
+    const output2 = await assertFor(handler, "add 2 3", output1.state, 5);
+    output2.state.topics.length.should.equal(1);
 
-    const output2 = await handler(
-      message2,
-      output1.state,
-      getUserData(),
-      getHost()
+    const output3 = await assertFor(
+      handler,
+      "do advanced math",
+      output2.state,
+      "You can do advanced math now."
     );
-    output2.result.should.equal(5);
+    output3.state.topics.length.should.equal(2);
 
-    const message3 = {
-      text: "20 + 30"
-    };
+    const output4 = await assertFor(handler, "exp 2 8", output3.state, 256);
+    output4.state.topics.length.should.equal(2);
 
-    const output3 = await handler(
-      message3,
-      output1.state,
-      getUserData(),
-      getHost()
+    const output5 = await assertFor(
+      handler,
+      "do basic math",
+      output4.state,
+      "Back to basic math."
     );
-    output3.result.should.equal(50);
+
+    const output6 = await assertFor(
+      handler,
+      "exp 2 8",
+      output5.state,
+      "I don't know how to handle this."
+    );
+
+    const output7 = await assertFor(handler, "add 2 8", output6.state, 10);
   });
 
-  // it("Returns a message from a pattern", async () => {
-  //   const { env, topics } = getTopics({ includeMain: true });
-  //   const message = {
-  //     text: "Hello world"
-  //   };
-  //   const handler = await init(topics);
-  //   const result = await handler(message);
+  it("enters a top level topic and exits", async () => {
+    const handler = getHandler();
 
-  //   env._enteredMain.should.be.true();
-  //   result.output[0].should.equal("hey, what's up!");
-  // });
+    const output1 = await assertFor(
+      handler,
+      "help",
+      undefined,
+      "You're entering help mode. Type anything."
+    );
 
-  // it("Returns a message from a condition", async () => {
-  //   const { env, topics } = getTopics({ includeMain: true });
-  //   const message = {
-  //     text: "Boomshanker"
-  //   };
-  //   const handler = await init(topics);
-  //   const result = await handler(message);
+    const output2 = await assertFor(
+      handler,
+      "syntax",
+      output1.state,
+      "HELP: This is just a test suite. Nothing to see here, sorry."
+    );
+    output2.state.topics.length.should.equal(0);
+  });
 
-  //   env._enteredMain.should.be.true();
-  //   result.output[0].should.equal("omg zomg!");
-  // });
+  it("throws when state is reused", async () => {
+    try {
+      const handler = getHandler();
 
-  // it("Runs a topic when pattern matches", async () => {
-  //   const { env, topics } = getTopics();
-  //   const message = {
-  //     text: "nickname yakyak"
-  //   };
-  //   const handler = await init(topics);
-  //   await handler(message);
+      const output1 = await assertFor(
+        handler,
+        "do basic math",
+        undefined,
+        "You can type a math expression"
+      );
 
-  //   env._enteredNickname.should.be.true();
-  // });
+      const output2 = await assertFor(handler, "add 2 3", output1.state, 5);
+      output2.state.topics.length.should.equal(1);
 
-  // it("Runs a custom condition (non-regex)", async () => {
-  //   const { env, topics } = getTopics();
-  //   const message = {
-  //     text: "5 + 10"
-  //   };
-  //   const handler = await init(topics);
-  //   await handler(message);
+      const output3 = await assertFor(handler, "add 20 30", output1.state, 50);
+    } catch (ex) {
+      ex.message.should.equal(
+        "This evaluation state was previously used. Cannot reuse."
+      );
+    }
+  });
 
-  //   env._enteredMath.should.be.true();
-  // });
+  it("doesn't throw when the reuse flag is set", async () => {
+    const handler = getHandler();
 
-  // it("Run the default condition if nothing matches", async () => {
-  //   const { env, topics } = getTopics();
-  //   const message = {
-  //     text: "somethingweird"
-  //   };
-  //   const handler = await init(topics);
-  //   await handler(message);
+    const output1 = await assertFor(
+      handler,
+      "do basic math",
+      undefined,
+      "You can type a math expression"
+    );
 
-  //   env._enteredDefault.should.be.true();
-  // });
+    const output2 = await assertFor(handler, "add 2 3", output1.state, 5);
+    output2.state.topics.length.should.equal(1);
 
-  // it("Disables conditions", async () => {
-  //   const { env, topics } = getTopics();
-  //   const message = {
-  //     text: "wildcard going to be alone"
-  //   };
-  //   const handler = await init(topics);
-  //   await handler(message);
+    const output3 = await assertFor(handler, "add 20 30", output1.state, 50, {
+      reuseState: true
+    });
+    output2.state.topics.length.should.equal(1);
+  });
 
-  //   env._enteredWildcard.should.be.true();
-  // });
+  it("persists stateful topics", async () => {
+    const handler = getHandler();
 
-  // it("Runs a condition for each message", async () => {
-  //   const { env, topics } = getTopics();
-  //   const message = {
-  //     text: "wildcard going to be alone"
-  //   };
-  //   const handler = await init(topics);
-  //   env._disabled = ["nickname"];
-  //   const result = await handler(message);
+    const output1 = await assertFor(
+      handler,
+      "reset password",
+      undefined,
+      "Set your password."
+    );
 
-  //   env._enteredWildcard.should.be.true();
+    const output2 = await assertFor(
+      handler,
+      "hello",
+      output1.state,
+      "Repeat your password."
+    );
+    output2.state.topics.length.should.equal(1);
 
-  //   const message2 = {
-  //     text: "nickname yakyak"
-  //   };
-  //   await handler(message2, result.contexts);
+    const output3 = await assertFor(
+      handler,
+      "world",
+      output2.state,
+      "Password don't match. Reenter both passwords."
+    );
+    output3.state.topics.length.should.equal(1);
 
-  //   env._enteredDefault.should.be.true();
-  // });
+    const output4 = await assertFor(
+      handler,
+      "hello",
+      output3.state,
+      "Repeat your password."
+    );
+    output4.state.topics.length.should.equal(1);
 
-  // it("Disables conditions except specified conditions", async () => {
-  //   const { env, topics } = getTopics();
-  //   const message = {
-  //     text: "wildcard disableConditionsExcept mathexp"
-  //   };
-  //   const handler = await init(topics);
-  //   env._enabled = ["mathexp"];
-  //   const result = await handler(message);
-
-  //   env._enteredWildcard.should.be.true();
-
-  //   const message2 = {
-  //     text: "5 + 10"
-  //   };
-  //   await handler(message2, result.contexts);
-
-  //   env._enteredMathExp.should.be.true();
-  // });
-
-  // it("Receives result from sub topic via callback", async () => {
-  //   const { env, topics } = getTopics();
-  //   const message = {
-  //     text: "signup Yak"
-  //   };
-  //   const handler = await init(topics);
-  //   const result1 = await handler(message);
-  //   env._enteredSignup.should.be.true();
-
-  //   const message2 = {
-  //     text: "name"
-  //   };
-  //   const result2 = await handler(message2, result1.contexts);
-  //   env._enteredValidate.should.be.true();
-
-  //   const message3 = {
-  //     text: "name Hemchand"
-  //   };
-  //   const result3 = await handler(message3, result2.contexts);
-
-  //   env._enteredOnValidateName.should.be.true();
-  //   result3.contexts.items.length.should.equal(1);
-  // });
-
-  // it("Clears all topics", async () => {
-  //   const { env, topics } = getTopics();
-  //   env._clearAllTopics = true;
-  //   const message1 = {
-  //     text: "signup Yak"
-  //   };
-  //   const handler = await init(topics);
-  //   const result1 = await handler(message1);
-  //   const message2 = {
-  //     text: "name"
-  //   };
-  //   const result2 = await handler(message2, result1.contexts);
-  //   const message3 = {
-  //     text: "name Hemchand"
-  //   };
-  //   const result3 = await handler(message3, result2.contexts);
-
-  //   result3.contexts.items.length.should.equal(0);
-  // });
-
-  // it("Throws error on enterTopic() if the provided context isn't on the top of the stack", async () => {
-  //   const { env, topics } = getTopics({ includeMain: true });
-  //   const message = {
-  //     text: "Hello world"
-  //   };
-  //   const handler = await init(topics);
-
-  //   env.enterTopic_assertTopContextTest = true;
-
-  //   let threwError = false;
-  //   try {
-  //     await handler(message);
-  //   } catch (e) {
-  //     threwError = true;
-  //     e.message.should.equal(
-  //       "You can only enter a new context from the last context."
-  //     );
-  //   }
-
-  //   threwError.should.be.true();
-  // });
-
-  // it("Throws error on exitTopic() if the provided context isn't on the top of the stack", async () => {
-  //   const { env, topics } = getTopics({ includeMain: true });
-  //   const message = {
-  //     text: "Hello world"
-  //   };
-
-  //   const handler = await init(topics);
-
-  //   env.exitTopic_assertTopContextTest = true;
-
-  //   let threwError = false;
-  //   try {
-  //     await handler(message);
-  //   } catch (e) {
-  //     threwError = true;
-  //     e.message.should.equal("You can only exit from the current context.");
-  //   }
-
-  //   threwError.should.be.true();
-  // });
+    const output5 = await assertFor(
+      handler,
+      "hello",
+      output4.state,
+      "Password reset complete."
+    );
+    output4.state.topics.length.should.equal(1);
+  });
 });
