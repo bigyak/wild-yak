@@ -4,10 +4,10 @@ Wild Yak is a state machine which can be used to make conversational bots.
 
 The state machine is organized as topics, with one topic active at a time. A topic is a class defining a method called handle() which receives user input and responds to it. The handle() method may also activate another topic as a result of an input. All inputs go the currently active topic.
 
-There are two special topics - rootTopic and defaultTopic. The handle method of the rootTopic is invoked when the currently active topic chooses not to handle an input. The defaultTopic is the first topic to be set as active during application launch.
+There are two special topics - RootTopic and DefaultTopic. The handle method of the RootTopic is invoked when the currently active topic chooses not to handle an input. The DefaultTopic is the first topic to be set as active after initialization.
 
 The full source for the examples below can be seen at: https://github.com/bigyak/wild-yak/blob/master/src/test
-In fact, going through the tests will be the best way to learn how to use this library.
+Going through the tests will be the best way to learn how to use this library.
 
 Before doing anything, we need to define four data types:
 
@@ -71,7 +71,7 @@ export class RootTopic extends TopicBase<IMessage, ResultType, IUserData, IHost>
 }
 ```
 
-Let's also define a defaultTopic, which is the first topic to be loaded when the app starts. Its purpose is life is very simple - if it receives "hello world" it will respond with "greetings comrade!".
+Let's also define a defaultTopic, which is the first topic to be loaded when the app starts. Its purpose in life is very simple - if it receives "hello world" it will respond with "greetings comrade!".
 
 ```typescript
 export class DefaultTopic
@@ -146,7 +146,7 @@ async function run() {
 }
 ```
 
-We can continue the conversation by passing more messages the handler. But remember to send the most recent state along with the input. In the following example, you can notice that the second call passes the state retrieved from the previous response. This allows each topic to maintain internal state.
+We can continue the conversation by passing more messages the handler. But remember to send the most recent state along with the input. In the following example, notice that the second call passes the state retrieved from the previous response. This allows each topic to maintain internal state.
 
 Continuing from the last example: 
 

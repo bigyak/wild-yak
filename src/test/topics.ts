@@ -1,4 +1,3 @@
-import { resolve } from "path";
 import { IEvalState, IHandlerResult, ITopic, TopicBase } from "..";
 
 export interface IMessage {
