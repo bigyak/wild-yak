@@ -1,6 +1,6 @@
 {
   "name": "wild-yak",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "Yak<yak@agilehead.com>",
   "scripts": {
     "build": "./build.sh",
