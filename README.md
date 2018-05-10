@@ -34,7 +34,7 @@ export interface IHost {
 }
 ```
 
-Now let's define a rootTopic. All Topics inherit from TopicBase and implement ITopic. This topic handles three specific messages ("do basic math", "help", "reset password") all of which activate other topics, and a generic response if it doesn't understand the input.
+Now let's define a RootTopic. All Topics inherit from TopicBase and implement ITopic. This topic handles three specific messages ("do basic math", "help", "reset password") all of which activate other topics, and a generic response if it doesn't understand the input.
 
 ```typescript
 export class RootTopic extends TopicBase<IMessage, ResultType, IUserData, IHost>
@@ -71,7 +71,7 @@ export class RootTopic extends TopicBase<IMessage, ResultType, IUserData, IHost>
 }
 ```
 
-Let's also define a defaultTopic, which is the first topic to be loaded when the app starts. Its purpose in life is very simple - if it receives "hello world" it will respond with "greetings comrade!".
+Let's also define a DefaultTopic, which is the first topic to be loaded when the app starts. Its purpose in life is very simple - if it receives "hello world" it will respond with "greetings comrade!".
 
 ```typescript
 export class DefaultTopic
