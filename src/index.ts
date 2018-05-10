@@ -165,11 +165,19 @@ function exitTopic<TMessage, TResult, TUserData, THost>(
   evalState.topics.pop();
 }
 
+export type Handler<TMessage, TResult, TUserData, THost> = (
+  message: TMessage,
+  stateSerializedByHost: ISerializableEvalState | undefined,
+  userData: TUserData,
+  host: THost,
+  options?: { reuseState: boolean }
+) => Promise<{ result: TResult | undefined; state: ISerializableEvalState }>;
+
 export function init<TMessage, TResult, TUserData, THost>(
   rootTopicCtor: ITopicCtor<ITopic<TMessage, TResult, TUserData, THost>>,
   defaultTopicCtor: ITopicCtor<ITopic<TMessage, TResult, TUserData, THost>>,
   otherTopicCtors: ITopicCtor<ITopic<TMessage, TResult, TUserData, THost>>[]
-) {
+): Handler<TMessage, TResult, TUserData, THost> {
   const rootTopic = new rootTopicCtor();
 
   const topicMap: ITopicMap<TMessage, TResult, TUserData, THost> = [
@@ -200,7 +208,7 @@ export function init<TMessage, TResult, TUserData, THost>(
     userData: TUserData,
     host: THost,
     options: { reuseState: boolean } = { reuseState: false }
-  ): Promise<{ result: any; state: ISerializableEvalState }> {
+  ): Promise<{ result: TResult | undefined; state: ISerializableEvalState }> {
     if (options.reuseState || !stateSerializedByHost.used) {
       stateSerializedByHost.used = true;
 
@@ -228,9 +236,7 @@ export function init<TMessage, TResult, TUserData, THost>(
         state: toSerializable(evalState)
       };
     } else {
-      throw new Error(
-        "This evaluation state was previously used."
-      );
+      throw new Error("This evaluation state was previously used.");
     }
   };
 }
