@@ -1,7 +1,8 @@
 {
   "name": "wild-yak",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "author": "Yak<yak@agilehead.com>",
+  "types": "dist/index.d.ts",
   "scripts": {
     "build": "./build.sh",
     "test": "./build.sh && mocha dist/test/test.js"
