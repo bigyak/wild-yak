@@ -76,7 +76,7 @@ interface ITopicMap<TMessage, TResult, TUserData, THost> {
 
 function getActiveTopic<TMessage, TResult, TUserData, THost>(
   evalState: IEvalState<TMessage, TResult, TUserData, THost>
-): ITopic<TMessage, TResult, TUserData, THost> {
+): ITopic<TMessage, TResult, TUserData, THost> | undefined {
   return evalState.topics.slice(-1)[0];
 }
 
@@ -90,12 +90,11 @@ async function processMessage<TMessage, TResult, TUserData, THost>(
   const activeTopic = getActiveTopic<TMessage, TResult, TUserData, THost>(
     evalState
   );
-  const { handled, result } = await activeTopic.handle(
-    evalState,
-    message,
-    userData,
-    host
-  );
+
+  const { handled, result } = activeTopic
+    ? await activeTopic.handle(evalState, message, userData, host)
+    : { handled: false, result: undefined };
+
   if (handled) {
     return { handled, result };
   } else {
@@ -167,14 +166,17 @@ function exitTopic<TMessage, TResult, TUserData, THost>(
 
 export function init<TMessage, TResult, TUserData, THost>(
   rootTopicCtor: ITopicCtor<ITopic<TMessage, TResult, TUserData, THost>>,
-  defaultTopicCtor: ITopicCtor<ITopic<TMessage, TResult, TUserData, THost>>,
-  otherTopicCtors: ITopicCtor<ITopic<TMessage, TResult, TUserData, THost>>[]
+  otherTopicCtors: ITopicCtor<ITopic<TMessage, TResult, TUserData, THost>>[],
+  defaultTopicCtor?: ITopicCtor<ITopic<TMessage, TResult, TUserData, THost>>
 ) {
   const rootTopic = new rootTopicCtor();
 
-  const topicMap: ITopicMap<TMessage, TResult, TUserData, THost> = [
-    defaultTopicCtor
-  ]
+  const topicMap: ITopicMap<
+    TMessage,
+    TResult,
+    TUserData,
+    THost
+  > = (defaultTopicCtor ? [defaultTopicCtor] : [])
     .concat(otherTopicCtors)
     .reduce(
       (
@@ -212,7 +214,9 @@ export function init<TMessage, TResult, TUserData, THost>(
 
       if (evalState.virgin) {
         evalState.virgin = false;
-        enterTopic(evalState, new defaultTopicCtor());
+        if (defaultTopicCtor) {
+          enterTopic(evalState, new defaultTopicCtor());
+        }
       }
 
       const { handled, result } = await processMessage(
@@ -228,9 +232,7 @@ export function init<TMessage, TResult, TUserData, THost>(
         state: toSerializable(evalState)
       };
     } else {
-      throw new Error(
-        "This evaluation state was previously used."
-      );
+      throw new Error("This evaluation state was previously used.");
     }
   };
 }

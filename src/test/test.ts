@@ -37,11 +37,11 @@ function getHost(): IHost {
   };
 }
 
-function getHandler() {
+function getHandler(hasDefaultTopic = true) {
   return init<IMessage, ResultType, IUserData, IHost>(
     RootTopic,
-    DefaultTopic,
-    otherTopics
+    otherTopics,
+    hasDefaultTopic ? DefaultTopic : undefined
   );
 }
 
@@ -112,6 +112,17 @@ describe("Wild yak", () => {
       "Life is like riding a bicycle. To keep your balance you must keep moving."
     );
     output.state.topics.length.should.equal(1);
+  });
+
+  it("handles a message with root topic if default topic is unspecified", async () => {
+    const handler = getHandler(false);
+    const output = await assertFor(
+      handler,
+      "hello world",
+      undefined,
+      "Life is like riding a bicycle. To keep your balance you must keep moving."
+    );
+    output.state.topics.length.should.equal(0);
   });
 
   it("enters a new topic", async () => {
