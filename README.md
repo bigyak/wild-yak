@@ -1,3 +1,7 @@
+# Don't use this!!!
+
+There are easier ways to do this. Ignore the following over-engineered project.
+
 # wild-yak
 
 Wild Yak is a state machine which can be used to make conversational bots.
